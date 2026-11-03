@@ -1,0 +1,52 @@
+﻿# Ambiente de referência: N nós lógicos em uma única máquina (Docker Compose v2).
+# Cada nó = contêiner independente; comunicação somente via rede HTTP/JSON (porta 8000).
+# Os nós 4 e 5 ficam no perfil "n5"; use ./scripts/env.sh up5, que também ajusta PEERS para 5 nós.
+
+x-node: &node
+  build: .
+  image: mc714-node
+  networks: [mc714]
+  volumes:
+    - ./results/logs:/app/results/logs
+  restart: "no"
+
+x-env: &env
+  PEERS: "${PEERS:-1=node1:8000,2=node2:8000,3=node3:8000}"
+  PORT: "8000"
+  SEED: "${SEED:-1001}"
+  LOG_DIR: /app/results/logs
+  RPC_TIMEOUT: "${RPC_TIMEOUT:-1.0}"
+  PING_INTERVAL: "${PING_INTERVAL:-1.0}"
+  NET_DROP_PROB: "${NET_DROP_PROB:-0}"
+  NET_DELAY_MS: "${NET_DELAY_MS:-0}"
+  NET_JITTER_MS: "${NET_JITTER_MS:-0}"
+  NET_DUP_PROB: "${NET_DUP_PROB:-0}"
+
+services:
+  node1:
+    <<: *node
+    container_name: mc714-node1
+    environment: {<<: *env, NODE_ID: "1"}
+  node2:
+    <<: *node
+    container_name: mc714-node2
+    environment: {<<: *env, NODE_ID: "2"}
+  node3:
+    <<: *node
+    container_name: mc714-node3
+    environment: {<<: *env, NODE_ID: "3"}
+  node4:
+    <<: *node
+    container_name: mc714-node4
+    profiles: [n5]
+    environment: {<<: *env, NODE_ID: "4"}
+  node5:
+    <<: *node
+    container_name: mc714-node5
+    profiles: [n5]
+    environment: {<<: *env, NODE_ID: "5"}
+
+networks:
+  mc714:
+    driver: bridge
+
