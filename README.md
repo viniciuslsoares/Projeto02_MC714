@@ -1,4 +1,4 @@
-﻿# Projeto 02 — MC714: Algoritmos Distribuídos
+# Projeto 02 — MC714: Algoritmos Distribuídos
 
 Nós lógicos em Python (HTTP/JSON, usando só a biblioteca padrão) orquestrados por Docker Compose v2.
 Algoritmos planejados: eleição **Bully** + detector de falhas por **heartbeat**, com extras de
@@ -17,19 +17,25 @@ Docker + Docker Compose v2, Python ≥ 3.12 (testes), bash (WSL/Git Bash no Wind
 ./scripts/env.sh logs         # logs JSON dos nós
 ./scripts/env.sh down         # remove contêineres, rede e volumes
 ./scripts/env.sh smoke        # sobe, confere pings entre nós e derruba
+./scripts/run_scenario.sh scenarios/particao_rede.yaml  # executa cenário declarativo de falha
 python -m pip install -r requirements.txt
 python -m pytest              # testes automatizados
 ```
 Logs estruturados (JSONL, um arquivo por nó) ficam em `results/logs/node<ID>.jsonl`.
+Resultados de cenários com metadados ficam em `results/raw/<cenario>_seed<SEED>/`.
 
-## Arquitetura da infraestrutura (issue #1)
+## Arquitetura e Falhas (issues #1 e #2)
 | Arquivo | Papel |
 |---|---|
 | `src/config.py` | Configuração via variáveis de ambiente (id, peers, porta, seed, timeouts, falhas de rede) |
 | `src/models.py` | `Message` e `LogEvent` |
 | `src/eventlog.py` | Relógio de Lamport + log JSONL thread-safe |
 | `src/network.py` | Transporte HTTP/JSON com **timeout obrigatório**; perda, atraso, duplicação e partição injetáveis (RNG semeado) |
-| `src/node.py` | Nó genérico: servidor HTTP, `register(tipo, handler)`, ping periódico opcional |
+| `src/node.py` | Nó genérico: servidor HTTP, rotas `/msg`, `/control` (falhas dinâmicas), persistência de estado e healthcheck |
+| `experiments/fault_injector.py` | Injetor programático que lê cenários em YAML e comanda partições, atrasos e crashes |
+| `scenarios/` | Cenários declarativos reproduzíveis (`particao_rede.yaml`, `queda_e_recuperacao.yaml`) |
+| `scripts/run_scenario.sh` | Runner automatizado para subir cluster, rodar cenário, coletar logs e salvar metadados |
+| `docs/modelo_falhas.md` | Documentação formal das hipóteses de falhas, técnica adotada e limitações do ambiente |
 
 Algoritmos registram handlers com `node.register("TIPO", fn)` e enviam com `node.net.send(peer, "TIPO", payload, timeout)`.
 

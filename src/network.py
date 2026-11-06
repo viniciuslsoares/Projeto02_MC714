@@ -31,17 +31,43 @@ class Network:
         self.bloqueados = set()      # peers "isolados" (partição simulada)
         self.lock = threading.Lock()
 
-    # --- controle das falhas (a issue #2 vai usar isso nos cenários) ---
+    # --- controle dinâmico de falhas (usado pelo injetor de falhas) ---
     def set_faults(self, faults):
-        self.faults = faults
+        with self.lock:
+            self.faults = faults
+        self.log.emit(
+            "faults_updated",
+            drop_prob=faults.drop_prob,
+            delay_ms=faults.delay_ms,
+            jitter_ms=faults.jitter_ms,
+            dup_prob=faults.dup_prob,
+        )
+
+    def reset_faults(self):
+        with self.lock:
+            self.faults = NetFaults()
+            self.bloqueados.clear()
+        self.log.emit("faults_reset")
 
     def block(self, peer_id):
         with self.lock:
             self.bloqueados.add(peer_id)
+        self.log.emit("partition_start", peer=peer_id)
 
     def unblock(self, peer_id):
         with self.lock:
             self.bloqueados.discard(peer_id)
+        self.log.emit("partition_end", peer=peer_id)
+
+    def get_status(self):
+        with self.lock:
+            return {
+                "bloqueados": sorted(list(self.bloqueados)),
+                "drop_prob": self.faults.drop_prob,
+                "delay_ms": self.faults.delay_ms,
+                "jitter_ms": self.faults.jitter_ms,
+                "dup_prob": self.faults.dup_prob,
+            }
 
     def sorteio(self):
         # número aleatório entre 0 e 1 (com lock porque várias threads enviam)
@@ -56,21 +82,22 @@ class Network:
             raise ValueError("timeout deve ser maior que 0")
 
         msg = Message(msg_type, self.node_id, self.clock.tick(), payload or {})
-        faults = self.faults
 
-        # partição: não envia nada
+        # partição: não envia nada se o peer estiver na lista de bloqueados
         with self.lock:
             isolado = peer_id in self.bloqueados
+            faults = self.faults
+
         if isolado:
             self.log.emit("drop", peer=peer_id, msg=msg_type, reason="partition")
             return None
 
-        # perda de mensagem
+        # perda de mensagem simulada
         if faults.drop_prob > 0 and self.sorteio() < faults.drop_prob:
             self.log.emit("drop", peer=peer_id, msg=msg_type, reason="loss")
             return None
 
-        # atraso
+        # atraso simulado
         atraso = faults.delay_ms
         if faults.jitter_ms > 0:
             atraso = atraso + self.sorteio() * faults.jitter_ms

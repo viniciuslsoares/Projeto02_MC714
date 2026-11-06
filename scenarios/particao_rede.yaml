@@ -1,0 +1,17 @@
+# Cenário de Partição de Rede Temporária
+# O nó 3 é isolado dos nós 1 e 2 aos 3 segundos, e a partição é curada aos 8 segundos.
+name: "particao_rede"
+description: "Isola o nó 3 dos nós 1 e 2 temporariamente e restaura a conectividade"
+duration_s: 12.0
+seed: 1001
+
+events:
+  - time_s: 3.0
+    action: "partition"
+    nodes: [1, 2]
+    target: 3
+
+  - time_s: 8.0
+    action: "heal"
+    nodes: [1, 2]
+    target: 3
