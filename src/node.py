@@ -3,16 +3,20 @@
 # vão usar node.register("TIPO", funcao) e node.net.send(...).
 #
 # Endpoints:
-#   POST /msg     recebe uma Message em JSON e responde com outra Message
-#   GET  /health  usado pelo healthcheck do Docker
+#   POST /msg      recebe uma Message em JSON e responde com outra Message
+#   POST /control  recebe comandos de injeção de falhas (block, unblock, set_faults, etc.)
+#   GET  /health   usado pelo healthcheck do Docker
+#   GET  /status   consulta estado do nó e falhas ativas
 #
 # Para rodar: python -m src.node   (configuração por variáveis de ambiente)
 import json
+import os
 import signal
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import config
+from .config import NetFaults
 from .eventlog import EventLog, LamportClock
 from .models import Message
 from .network import Network
@@ -42,6 +46,25 @@ class Node:
         t = threading.Thread(target=funcao, name=nome, daemon=True)
         t.start()
 
+    def salvar_estado(self, nome, dados):
+        # Salva um dicionário em disco (persistência para crash-recovery)
+        pasta = os.path.join(self.cfg.log_dir, "state")
+        os.makedirs(pasta, exist_ok=True)
+        caminho = os.path.join(pasta, f"node{self.id}_{nome}.json")
+        with open(caminho, "w", encoding="utf-8") as f:
+            json.dump(dados, f)
+        self.log.emit("state_saved", name=nome)
+
+    def carregar_estado(self, nome):
+        # Lê o estado salvo anteriormente (se existir)
+        caminho = os.path.join(self.cfg.log_dir, "state", f"node{self.id}_{nome}.json")
+        if not os.path.exists(caminho):
+            return None
+        with open(caminho, "r", encoding="utf-8") as f:
+            dados = json.load(f)
+        self.log.emit("state_loaded", name=nome)
+        return dados
+
     def handle(self, msg):
         # chamado para cada mensagem recebida
         self.clock.update(msg.clock)
@@ -52,6 +75,40 @@ class Node:
             return Message("error", self.id, self.clock.tick(), {"error": "unknown_type"})
         resultado = handler(msg)
         return Message("ok", self.id, self.clock.tick(), resultado)
+
+    def handle_control(self, cmd):
+        # Endpoint de controle usado pelo injetor de falhas
+        action = cmd.get("action")
+        self.log.emit("control_received", action=action, cmd=cmd)
+
+        if action == "block":
+            peer = int(cmd["peer"])
+            self.net.block(peer)
+            return {"ok": True, "action": "block", "peer": peer}
+
+        elif action == "unblock":
+            peer = int(cmd["peer"])
+            self.net.unblock(peer)
+            return {"ok": True, "action": "unblock", "peer": peer}
+
+        elif action == "set_faults":
+            novas_falhas = NetFaults(
+                drop_prob=float(cmd.get("drop_prob", self.net.faults.drop_prob)),
+                delay_ms=float(cmd.get("delay_ms", self.net.faults.delay_ms)),
+                jitter_ms=float(cmd.get("jitter_ms", self.net.faults.jitter_ms)),
+                dup_prob=float(cmd.get("dup_prob", self.net.faults.dup_prob)),
+            )
+            self.net.set_faults(novas_falhas)
+            return {"ok": True, "action": "set_faults", "faults": self.net.get_status()}
+
+        elif action == "reset_faults":
+            self.net.reset_faults()
+            return {"ok": True, "action": "reset_faults"}
+
+        elif action == "status":
+            return {"ok": True, "status": self.net.get_status()}
+
+        return {"ok": False, "error": f"acao_desconhecida: {action}"}
 
     def criar_servidor(self):
         node = self    # o handler abaixo precisa acessar o nó
@@ -71,21 +128,40 @@ class Node:
             def do_GET(self):
                 if self.path == "/health":
                     self.responder(200, {"node": node.id, "up": True})
+                elif self.path == "/status":
+                    self.responder(200, {
+                        "node": node.id,
+                        "up": True,
+                        "clock": node.clock.valor,
+                        "faults": node.net.get_status()
+                    })
                 else:
                     self.responder(404, {"error": "not_found"})
 
             def do_POST(self):
-                if self.path != "/msg":
+                if self.path == "/msg":
+                    try:
+                        tamanho = int(self.headers.get("Content-Length", "0"))
+                        texto = self.rfile.read(tamanho).decode("utf-8")
+                        msg = Message.from_dict(json.loads(texto))
+                    except (ValueError, KeyError):
+                        self.responder(400, {"error": "bad_request"})
+                        return
+                    self.responder(200, node.handle(msg).to_dict())
+
+                elif self.path == "/control":
+                    try:
+                        tamanho = int(self.headers.get("Content-Length", "0"))
+                        texto = self.rfile.read(tamanho).decode("utf-8")
+                        cmd = json.loads(texto)
+                    except (ValueError, KeyError):
+                        self.responder(400, {"error": "bad_request"})
+                        return
+                    resultado = node.handle_control(cmd)
+                    self.responder(200, resultado)
+
+                else:
                     self.responder(404, {"error": "not_found"})
-                    return
-                try:
-                    tamanho = int(self.headers.get("Content-Length", "0"))
-                    texto = self.rfile.read(tamanho).decode("utf-8")
-                    msg = Message.from_dict(json.loads(texto))
-                except (ValueError, KeyError):
-                    self.responder(400, {"error": "bad_request"})
-                    return
-                self.responder(200, node.handle(msg).to_dict())
 
         ThreadingHTTPServer.daemon_threads = True
         return ThreadingHTTPServer(("0.0.0.0", self.cfg.port), Handler)

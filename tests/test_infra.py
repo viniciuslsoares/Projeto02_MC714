@@ -1,4 +1,4 @@
-﻿"""Testes da infraestrutura base (issue #1): config, transporte com timeout, logs e falhas injetadas."""
+"""Testes da infraestrutura base (issue #1): config, transporte com timeout, logs e falhas injetadas."""
 import socket
 import threading
 import time
@@ -145,3 +145,50 @@ def test_logs_jsonl_parseaveis(cluster):
 def test_message_roundtrip():
     m = Message("x", 3, 7, {"a": 1})
     assert Message.from_dict(m.to_dict()) == m
+
+
+def test_endpoint_controle_bloqueio_e_falhas(cluster):
+    import json
+    import urllib.request
+
+    node1, node2 = cluster[0], cluster[1]
+
+    # Envia comando de bloqueio via HTTP POST /control
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{node1.port}/control",
+        data=json.dumps({"action": "block", "peer": 2}).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=1.0) as resp:
+        res = json.loads(resp.read().decode("utf-8"))
+        assert res["ok"] is True
+        assert res["action"] == "block"
+
+    # Agora o nó 1 não consegue enviar para o 2
+    assert node1.net.send(2, "ping") is None
+
+    # Desbloqueia via /control
+    req_unblock = urllib.request.Request(
+        f"http://127.0.0.1:{node1.port}/control",
+        data=json.dumps({"action": "unblock", "peer": 2}).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req_unblock, timeout=1.0) as resp:
+        res = json.loads(resp.read().decode("utf-8"))
+        assert res["ok"] is True
+
+    assert node1.net.send(2, "ping") is not None
+
+
+def test_persistencia_de_estado_do_no(tmp_path):
+    c = cfg.NodeConfig(node_id=1, peers={}, port=0, log_dir=str(tmp_path))
+    node = Node(c, echo_log=False)
+    node.salvar_estado("termo", {"termo_atual": 3, "votou_em": 2})
+
+    # Simula reinício do nó criando uma nova instância com mesmo diretório de log
+    novo_node = Node(c, echo_log=False)
+    dados = novo_node.carregar_estado("termo")
+    assert dados == {"termo_atual": 3, "votou_em": 2}
+
