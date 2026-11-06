@@ -1,4 +1,4 @@
-﻿# Ambiente de referência: N nós lógicos em uma única máquina (Docker Compose v2).
+# Ambiente de referência: N nós lógicos em uma única máquina (Docker Compose v2).
 # Cada nó = contêiner independente; comunicação somente via rede HTTP/JSON (porta 8000).
 # Os nós 4 e 5 ficam no perfil "n5"; use ./scripts/env.sh up5, que também ajusta PEERS para 5 nós.
 
@@ -26,24 +26,29 @@ services:
   node1:
     <<: *node
     container_name: mc714-node1
+    ports: ["8001:8000"]
     environment: {<<: *env, NODE_ID: "1"}
   node2:
     <<: *node
     container_name: mc714-node2
+    ports: ["8002:8000"]
     environment: {<<: *env, NODE_ID: "2"}
   node3:
     <<: *node
     container_name: mc714-node3
+    ports: ["8003:8000"]
     environment: {<<: *env, NODE_ID: "3"}
   node4:
     <<: *node
     container_name: mc714-node4
     profiles: [n5]
+    ports: ["8004:8000"]
     environment: {<<: *env, NODE_ID: "4"}
   node5:
     <<: *node
     container_name: mc714-node5
     profiles: [n5]
+    ports: ["8005:8000"]
     environment: {<<: *env, NODE_ID: "5"}
 
 networks:

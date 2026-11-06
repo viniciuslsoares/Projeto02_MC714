@@ -1,0 +1,26 @@
+# Cenário de Falha por Crash-Stop, Degradação de Link e Crash-Recovery
+# O nó 2 sofre crash aos 3s, o enlace entre nó 1 e 3 sofre atraso de 100ms aos 5s,
+# e o nó 2 se recupera aos 8s. A rede volta ao normal aos 11s.
+name: "queda_e_recuperacao"
+description: "Simula crash e retorno do nó 2 com atraso temporário no nó 1"
+duration_s: 14.0
+seed: 1002
+
+events:
+  - time_s: 3.0
+    action: "crash"
+    node: 2
+
+  - time_s: 5.0
+    action: "set_faults"
+    node: 1
+    delay_ms: 100.0
+    jitter_ms: 20.0
+
+  - time_s: 8.0
+    action: "recover"
+    node: 2
+
+  - time_s: 11.0
+    action: "reset_faults"
+    node: 1
