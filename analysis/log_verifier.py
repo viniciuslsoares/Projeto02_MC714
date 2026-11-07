@@ -237,8 +237,10 @@ def convergencia(vidas, t0, folga):
             continue
         anterior = c
         # confere no prazo, ou um instante antes da próxima perturbação, se ela vier antes
+        # (nunca antes de c: processos locais podem subir a menos de EPS um do outro)
         h = min([c + prazo] + [p for p in perturbacoes if p > c])
-        if not convergiu(bs, h - EPS):
+        ponto = max(c, h - EPS)
+        if not convergiu(bs, ponto):
             if h < c + prazo:
                 nao_conferidas += 1   # perturbado antes do prazo: não dá para cobrar
             else:
@@ -248,7 +250,7 @@ def convergencia(vidas, t0, folga):
         total += 1
         # entre c e h só os "leader" mudam o estado; mede até o início do último trecho convergido
         t = None
-        for x in [c] + sorted(t for v in bs for t, _ in v.lideres if c < t < h):
+        for x in [c] + sorted(t for v in bs for t, _ in v.lideres if c < t <= ponto):
             if not convergiu(bs, x):
                 t = None
             elif t is None:

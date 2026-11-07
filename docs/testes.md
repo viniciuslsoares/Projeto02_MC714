@@ -9,6 +9,7 @@ Implementação: `tests/` e `analysis/log_verifier.py` (issue #5). As propriedad
   - `test_faults::test_carregar_*` (cenários YAML).
   - `test_detector::test_suspeita_e_restauracao` e os unitários de `test_bully` (handlers e decisão de eleição com estado escolhido à mão).
   - `test_log_verifier::test_violacao_deliberada_e_detectada` (verificador com logs sintéticos).
+  - `test_experimentos::test_medir_com_log_sintetico` (métricas dos experimentos com um log sintético).
 - **Integração:** vários nós reais trocando mensagens HTTP.
   - No pytest (local e CI), com os nós em threads e portas livres em 127.0.0.1:
     - `test_sanity`;
@@ -16,6 +17,7 @@ Implementação: `tests/` e `analysis/log_verifier.py` (issue #5). As propriedad
     - `test_handler_erro`;
     - `test_detector::test_rede_estavel_sem_falso_positivo`;
     - `test_bully::test_cenario_normal_lider_e_o_maior_id`.
+    - `test_experimentos::test_grade_com_processos_reais` (uma grade pequena, com um processo por nó, grava o CSV e o `.meta.json`).
   - No compose (Docker, rodado à mão): `./scripts/env.sh smoke`; ou `./scripts/env.sh up` e, depois, `python -m analysis.log_verifier` sobre `results/logs`.
 - **Falhas:** crash, perda, atraso, duplicação e partição injetados.
   - No pytest:
