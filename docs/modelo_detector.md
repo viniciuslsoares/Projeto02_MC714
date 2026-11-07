@@ -21,8 +21,9 @@ Implementação: `src/detector.py` (issue #3). Testes: `tests/test_detector.py`.
 
 ## 3. Propriedades
 
-- **Completude (vivacidade):** todo nó que cai passa a ser suspeito por todos os nós corretos. Limite: o último heartbeat recebido é anterior ao crash, e a verificação roda a cada `intervalo`; logo, a detecção acontece até `timeout + intervalo` depois do crash (2,5 s com os padrões 0,5 s / 2,0 s).
-- **Precisão (segurança, garantida só eventualmente):** no modelo parcialmente síncrono, depois que os atrasos se estabilizam abaixo de Δ, nenhum nó correto é suspeito. Com perda probabilística isso não é garantido: um falso positivo exige perder cerca de k = `timeout / intervalo` heartbeats seguidos, com probabilidade ≈ pᵏ por janela (k = 4 nos padrões). Os falsos positivos são medidos nos experimentos (#6), e o peer é restaurado sozinho quando o próximo heartbeat chega.
+- **Segurança:** um peer só é suspeito depois de mais de `timeout` sem mandar heartbeat, e os avisos `suspect`/`restore` de um mesmo peer se alternam, sem repetição.
+- **Completude (vivacidade):** todo nó que cai passa a ser suspeito por todos os nós corretos. Limite: o último heartbeat recebido é anterior ao crash (o atraso simulado acontece no emissor e morre com ele), e a verificação roda a cada `intervalo`; logo, a detecção acontece até `timeout + intervalo` depois do crash (2,5 s com os padrões 0,5 s / 2,0 s).
+- **Precisão eventual (vivacidade):** no modelo parcialmente síncrono, depois que os atrasos se estabilizam abaixo de Δ, nenhum nó correto é suspeito. Com perda probabilística isso não é garantido: um falso positivo exige perder cerca de k = ⌊`timeout / intervalo`⌋ heartbeats seguidos, com probabilidade ≈ pᵏ por janela (k = 4 nos padrões). Quando `timeout` é múltiplo exato de `intervalo`, como nos padrões, às vezes k − 1 perdas já bastam (cada rodada dura um pouco mais que `intervalo`), então pᵏ subestima um pouco. Os falsos positivos são medidos nos experimentos (#6), e o peer é restaurado sozinho quando o próximo heartbeat chega.
 - **Custo:** n(n − 1) heartbeats por `intervalo` no sistema, O(n²). Para medir mensagens/s, filtrar `msg="heartbeat"` (o `PING_INTERVAL` da infraestrutura gera tráfego à parte).
 
 ## 4. Verificação
