@@ -23,7 +23,7 @@ python -m pytest              # testes automatizados
 Logs estruturados (JSONL, um arquivo por nó) ficam em `results/logs/node<ID>.jsonl`.
 Resultados de cenários com metadados ficam em `results/raw/<cenario>_seed<SEED>/`.
 
-## Arquitetura e Falhas (issues #1, #2 e #3)
+## Arquitetura e Falhas (issues #1 a #4)
 | Arquivo | Papel |
 |---|---|
 | `src/config.py` | Configuração via variáveis de ambiente (id, peers, porta, seed, timeouts, falhas de rede) |
@@ -36,6 +36,7 @@ Resultados de cenários com metadados ficam em `results/raw/<cenario>_seed<SEED>
 | `scripts/run_scenario.sh` | Runner automatizado para subir cluster, rodar cenário, coletar logs e salvar metadados |
 | `docs/modelo_falhas.md` | Documentação formal das hipóteses de falhas, técnica adotada e limitações do ambiente |
 | `src/detector.py` | Detector de falhas por heartbeat (#3): suspeita/restauração e callbacks `on_suspect`/`on_restore`; modelo em `docs/modelo_detector.md` |
+| `src/bully.py` | Eleição de líder pelo Bully (#4): `ELECTION`/`OK`/`COORDINATOR`, usa o detector para saber se o líder caiu; líder atual em `GET /status`; modelo em `docs/modelo_bully.md` |
 
 Algoritmos registram handlers com `node.register("TIPO", fn)` e enviam com `node.net.send(peer, "TIPO", payload, timeout)`.
 
@@ -48,8 +49,10 @@ do nó ⇒ reprodutíveis (com limites). Contêineres numa só máquina **não**
 Detalhes em [`docs/modelo_falhas.md`](docs/modelo_falhas.md) §6 (canal) e §7 (limitações conhecidas).
 
 ### Variáveis de ambiente
-`NODE_ID, PEERS, PORT, SEED, LOG_DIR, RPC_TIMEOUT, PING_INTERVAL, HB_INTERVAL, HB_TIMEOUT, NET_DROP_PROB,
+`NODE_ID, PEERS, HOST, PORT, SEED, LOG_DIR, RPC_TIMEOUT, PING_INTERVAL, HB_INTERVAL, HB_TIMEOUT, NET_DROP_PROB,
 NET_DELAY_MS, NET_JITTER_MS, NET_DUP_PROB` (detalhes em `src/config.py`). O `compose.yaml` aceita as mesmas via `.env`/shell.
+`HB_INTERVAL > 0` liga o detector e o Bully (o compose usa 0,5 s); o Bully usa `RPC_TIMEOUT` como timeout do OK.
+`HOST` é `127.0.0.1` por padrão; no compose é `0.0.0.0` dentro da rede interna, e as portas são publicadas só em `127.0.0.1` (o `/control` não tem autenticação).
 `SEED` é a semente do experimento (a registrada no `meta.json`); cada nó usa a sua própria, `SEED * 1000 + NODE_ID`, para que as falhas sorteadas sejam independentes entre nós.
 
 ## Reprodução completa e relatório

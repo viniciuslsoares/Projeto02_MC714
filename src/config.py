@@ -3,12 +3,14 @@
 #
 # NODE_ID        id do nó (obrigatório)
 # PEERS          outros nós no formato "1=node1:8000,2=node2:8000"
+# HOST           endereço em que o servidor HTTP escuta (padrão 127.0.0.1; o compose usa 0.0.0.0)
 # PORT           porta HTTP do nó (padrão 8000)
 # SEED           semente do experimento (padrão 0); a do nó é SEED * 1000 + NODE_ID
 # LOG_DIR        pasta dos logs (padrão results/logs)
-# RPC_TIMEOUT    timeout das chamadas de rede, em segundos (padrão 1.0)
+# RPC_TIMEOUT    timeout das chamadas de rede, em segundos (padrão 1.0); também é o
+#                timeout do Bully para o OK (o COORDINATOR é esperado por 2 * RPC_TIMEOUT)
 # PING_INTERVAL  intervalo do ping entre nós; 0 desliga (padrão 0)
-# HB_INTERVAL    intervalo do heartbeat do detector de falhas; 0 desliga (padrão 0)
+# HB_INTERVAL    intervalo do heartbeat do detector de falhas; 0 desliga o detector e o Bully (padrão 0)
 # HB_TIMEOUT     tempo sem heartbeat para suspeitar de um peer, em segundos (padrão 2.0)
 # NET_DROP_PROB, NET_DELAY_MS, NET_JITTER_MS, NET_DUP_PROB: falhas de rede simuladas
 import os
@@ -29,6 +31,7 @@ class NodeConfig:
     node_id: int
     peers: dict                 # id -> "host:porta"
     port: int = 8000
+    host: str = "127.0.0.1"
     seed: int = 0
     log_dir: str = "results/logs"
     rpc_timeout: float = 1.0
@@ -67,6 +70,7 @@ def from_env(env=None):
         node_id=node_id,
         peers=parse_peers(env.get("PEERS", ""), node_id),
         port=int(env.get("PORT", "8000")),
+        host=env.get("HOST", "127.0.0.1"),
         seed=int(env.get("SEED", "0")) * 1000 + node_id,
         log_dir=env.get("LOG_DIR", "results/logs"),
         rpc_timeout=float(env.get("RPC_TIMEOUT", "1.0")),

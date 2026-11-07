@@ -1,6 +1,6 @@
 # Nó genérico: sobe um servidor HTTP e entrega cada mensagem recebida para o
 # handler registrado para aquele tipo. Os algoritmos (Bully, detector de falhas)
-# vão usar node.register("TIPO", funcao) e node.net.send(...).
+# usam node.register("TIPO", funcao) e node.net.send(...).
 #
 # Endpoints:
 #   POST /msg      recebe uma Message em JSON e responde com outra Message
@@ -16,6 +16,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import config
+from .bully import Bully
 from .config import NetFaults
 from .detector import HeartbeatDetector
 from .eventlog import EventLog, LamportClock
@@ -35,6 +36,7 @@ class Node:
         self.parar = threading.Event()     # avisa as threads para terminarem
         self.server = None
         self.detector = None               # detector de falhas (src/detector.py), criado em main()
+        self.bully = None                  # eleição de líder (src/bully.py), criada em main()
         self.register("ping", self.on_ping)
 
     def on_ping(self, msg):
@@ -143,6 +145,7 @@ class Node:
                         "node": node.id,
                         "up": True,
                         "clock": node.clock.valor,
+                        "lider": node.bully.lider if node.bully is not None else None,
                         "faults": node.net.get_status()
                     })
                 else:
@@ -174,7 +177,9 @@ class Node:
                     self.responder(404, {"error": "not_found"})
 
         ThreadingHTTPServer.daemon_threads = True
-        return ThreadingHTTPServer(("0.0.0.0", self.cfg.port), Handler)
+        # HOST: 127.0.0.1 por padrão (o /control não tem autenticação); no contêiner o
+        # compose usa 0.0.0.0 para a rede interna e publica as portas só em 127.0.0.1
+        return ThreadingHTTPServer((self.cfg.host, self.cfg.port), Handler)
 
     @property
     def port(self):
@@ -192,6 +197,8 @@ class Node:
             self.spawn(self.loop_ping, "ping")
         if self.detector is not None:
             self.detector.start()
+        if self.bully is not None:
+            self.bully.start()
 
     def loop_ping(self):
         # de tempos em tempos, manda ping para todos os outros nós
@@ -221,7 +228,9 @@ def main():
     cfg = config.from_env()
     node = Node(cfg)
     if cfg.hb_interval > 0:
+        # o Bully depende do detector para saber se o líder caiu
         node.detector = HeartbeatDetector(node, cfg.hb_interval, cfg.hb_timeout)
+        node.bully = Bully(node, node.detector, cfg.rpc_timeout)
     node.run_forever()
 
 
