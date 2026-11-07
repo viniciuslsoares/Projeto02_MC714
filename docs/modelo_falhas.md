@@ -14,7 +14,9 @@ Para permitir a investigação experimental do comportamento dos algoritmos dist
    - **Reprodutibilidade:** todos os sorteios de perda, atraso e jitter utilizam um gerador pseudoaleatório próprio (`random.Random(seed)`), garantindo que a mesma semente gere rigorosamente a mesma sequência de eventos em qualquer máquina.
 
 2. **Falhas de Nó via Ciclo de Vida de Contêineres (Docker)**:
-   - Falhas de parada súbita (*crash-stop*) e religamento (*crash-recovery*) são orquestradas diretamente pelo Docker (`docker stop` e `docker start`).
+   - Falhas de parada súbita (*crash-stop*) e religamento (*crash-recovery*) são orquestradas diretamente pelo Docker (`docker kill` e `docker start`).
+   - `docker kill` envia SIGKILL ao processo do nó: ele morre na hora, sem executar código de encerramento e sem registrar `node_stop` no log, como num crash real. Não usamos `docker stop` porque ele envia SIGTERM, que o nó trata como desligamento gracioso (chama `stop()` e registra `node_stop`).
+   - `docker start` cria um processo novo do zero: todo o estado em memória se perde e só sobrevive o que está em disco.
 
 ---
 
@@ -22,8 +24,8 @@ Para permitir a investigação experimental do comportamento dos algoritmos dist
 
 | Tipo de Falha | Mecanismo de Injeção | Efeito no Sistema | Recuperação |
 |---|---|---|---|
-| **Crash-Stop** | `docker stop mc714-nodeX` | Nó encerra imediatamente suas conexões e para de responder a requisições e pings. | Não se recupera no cenário. |
-| **Crash-Recovery** | `docker start mc714-nodeX` | Nó volta a executar, carrega estado salvo em disco (`results/logs/state/`) e reintegra o cluster. | Volta ativo mantendo época/termo anterior. |
+| **Crash-Stop** | `docker kill mc714-nodeX` (SIGKILL) | Processo do nó morre na hora, sem encerramento gracioso: não executa `stop()` nem registra `node_stop` no log. Para de responder a requisições e pings. | Não se recupera no cenário. |
+| **Crash-Recovery** | `docker start mc714-nodeX` | Sobe um processo novo do zero; o estado em memória do processo anterior é perdido. Só sobrevive o que está em disco: os logs e o que o algoritmo gravou com `salvar_estado` (`results/logs/state/`), lido de volta com `carregar_estado`. | Volta a responder; o estado retomado (ex.: época/termo) depende de cada algoritmo usar a persistência. |
 | **Partição de Rede** | `action: partition` via `/control` | Bloqueio bidirecional de mensagens entre nós especificados (ex: isola nó 3 de 1 e 2). Mensagens são descartadas e logadas (`drop, reason=partition`). | `action: heal` desbloqueia o tráfego entre os nós. |
 | **Perda de Mensagens** | `drop_prob` via `/control` | Porcentagem configurável de mensagens é descartada silenciosamente no emissor (`drop, reason=loss`). | `action: reset_faults` restaura probabilidade a 0. |
 | **Atraso e Jitter** | `delay_ms` e `jitter_ms` | Mensagens sofrem atraso base fixo + jitter uniforme antes do envio HTTP. | `action: reset_faults` restaura atraso a 0ms. |
