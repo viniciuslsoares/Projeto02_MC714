@@ -50,7 +50,8 @@ class HeartbeatDetector:
             # todo peer começa com o prazo de `timeout` para mandar o primeiro heartbeat
             for peer in self.node.net.peers:
                 self.ultimo[peer] = agora
-        self.node.log.emit("detector_start", intervalo=self.intervalo, timeout=self.timeout)
+        self.node.log.emit("detector_start", intervalo=self.intervalo, timeout=self.timeout,
+                           peers=sorted(self.ultimo))
         # uma thread de envio por peer: um peer isolado ou lento não atrasa os outros
         for peer in sorted(self.node.net.peers):
             self.node.spawn(lambda p=peer: self.loop_envio(p), f"heartbeat-{peer}")

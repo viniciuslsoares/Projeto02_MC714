@@ -18,12 +18,13 @@ Docker + Docker Compose v2, Python ≥ 3.12 (testes), bash (WSL/Git Bash no Wind
 ./scripts/env.sh smoke        # sobe, confere pings entre nós e derruba
 ./scripts/run_scenario.sh scenarios/particao_rede.yaml  # executa cenário declarativo de falha
 python -m pip install -r requirements.txt
-python -m pytest              # testes automatizados
+python -m pytest              # testes automatizados (docs/testes.md)
+python -m analysis.log_verifier [pasta]  # verifica safety/liveness nos logs -> results/verifications.txt
 ```
 Logs estruturados (JSONL, um arquivo por nó) ficam em `results/logs/node<ID>.jsonl`.
 Resultados de cenários com metadados ficam em `results/raw/<cenario>_seed<SEED>/`.
 
-## Arquitetura e Falhas (issues #1 a #4)
+## Arquitetura e Falhas (issues #1 a #5)
 | Arquivo | Papel |
 |---|---|
 | `src/config.py` | Configuração via variáveis de ambiente (id, peers, porta, seed, timeouts, falhas de rede) |
@@ -37,6 +38,8 @@ Resultados de cenários com metadados ficam em `results/raw/<cenario>_seed<SEED>
 | `docs/modelo_falhas.md` | Documentação formal das hipóteses de falhas, técnica adotada e limitações do ambiente |
 | `src/detector.py` | Detector de falhas por heartbeat (#3): suspeita/restauração e callbacks `on_suspect`/`on_restore`; modelo em `docs/modelo_detector.md` |
 | `src/bully.py` | Eleição de líder pelo Bully (#4): `ELECTION`/`OK`/`COORDINATOR`, usa o detector para saber se o líder caiu; líder atual em `GET /status`; modelo em `docs/modelo_bully.md` |
+| `analysis/log_verifier.py` | Verificador de logs (#5): confere segurança e vivacidade do detector e do Bully e escreve `[OK]`/`[AVISO]` por propriedade; o `run_scenario.sh` roda ele no fim de cada cenário |
+| `docs/testes.md` | Estratégia de testes em 3 camadas, cenário normal e de falha de cada algoritmo, propriedades conferidas pelo verificador |
 
 Algoritmos registram handlers com `node.register("TIPO", fn)` e enviam com `node.net.send(peer, "TIPO", payload, timeout)`.
 
@@ -56,4 +59,4 @@ NET_DELAY_MS, NET_JITTER_MS, NET_DUP_PROB` (detalhes em `src/config.py`). O `com
 `SEED` é a semente do experimento (a registrada no `meta.json`); cada nó usa a sua própria, `SEED * 1000 + NODE_ID`, para que as falhas sorteadas sejam independentes entre nós.
 
 ## Reprodução completa e relatório
-Serão adicionados conforme as issues #5, #6 e #9.
+Testes e verificação: `docs/testes.md`. Experimentos e relatório serão adicionados conforme as issues #6 e #9.

@@ -190,9 +190,11 @@ class Node:
 
     def start(self):
         self.server = self.criar_servidor()
-        self.spawn(self.server.serve_forever, "http")
+        # node_start antes de atender: nenhum evento desta encarnação sai antes dele no log
+        # (o verificador de logs divide o arquivo em encarnações pelo node_start)
         self.log.emit("node_start", port=self.port, peers=sorted(self.cfg.peers), seed=self.cfg.seed,
                       incarnation=self.log.incarnation)
+        self.spawn(self.server.serve_forever, "http")
         if self.cfg.ping_interval > 0:
             self.spawn(self.loop_ping, "ping")
         if self.detector is not None:
@@ -208,10 +210,12 @@ class Node:
 
     def stop(self):
         self.parar.set()
+        # node_stop logo ao parar as threads: o shutdown do servidor pode levar até 0,5 s,
+        # e o verificador de logs considera o nó parado a partir daqui
+        self.log.emit("node_stop")
         if self.server is not None:
             self.server.shutdown()
             self.server.server_close()
-        self.log.emit("node_stop")
         self.log.close()
 
     def run_forever(self):

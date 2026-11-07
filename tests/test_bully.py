@@ -138,12 +138,13 @@ def test_lider_cai_novo_lider_e_anunciado_e_maior_id_volta(tmp_path):
     assert espera(lambda: lideres(vivos) == {1: 3, 2: 3, 3: 3}, LIMITE)
     assert {e["data"]["lider"] for e in eventos(vivos, "leader", t_crash)} == {3}
 
-    # o nó 4 volta (processo novo, sem estado, mesma porta): faz eleição e toma a liderança
-    novo = Node(cfg.NodeConfig(node_id=4, peers={}, port=porta, seed=4, log_dir=str(tmp_path)),
-                echo_log=False)
+    # o nó 4 volta (processo novo, sem estado, mesma porta): faz eleição e toma a liderança.
+    # Detector e Bully antes do start, como em main(): nenhum ELECTION chega sem handler
+    novo = Node(cfg.NodeConfig(4, {n.id: f"127.0.0.1:{n.port}" for n in vivos}, port=porta,
+                               seed=4, log_dir=str(tmp_path)), echo_log=False)
+    novo.detector = HeartbeatDetector(novo, INTERVALO, TIMEOUT_HB)
+    novo.bully = Bully(novo, novo.detector, TIMEOUT)
     novo.start()
-    novo.net.peers = {n.id: f"127.0.0.1:{n.port}" for n in vivos}
-    liga_bully([novo])
     todos = vivos + [novo]
     assert espera(lambda: lideres(todos) == {1: 4, 2: 4, 3: 4, 4: 4})
     time.sleep(QUIETO)

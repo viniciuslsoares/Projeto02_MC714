@@ -30,6 +30,7 @@ echo "=================================================="
 
 # 1. Prepara diretórios
 mkdir -p "$DEST_DIR"
+rm -f "$DEST_DIR"/node*.jsonl   # logs de uma execução anterior não se misturam aos desta
 mkdir -p results/logs
 rm -f results/logs/*.jsonl
 rm -rf results/logs/state
@@ -61,6 +62,10 @@ EOF
 # 5. Derruba o cluster
 echo ">> Finalizando contêineres..."
 docker compose down -v >/dev/null 2>&1
+
+# 6. Verifica segurança e vivacidade nos logs coletados (docs/testes.md)
+echo ">> Verificando os logs..."
+python -m analysis.log_verifier "$DEST_DIR" --saida "$DEST_DIR/verifications.txt"
 
 echo "=================================================="
 echo "[OK] Cenário concluído com sucesso!"

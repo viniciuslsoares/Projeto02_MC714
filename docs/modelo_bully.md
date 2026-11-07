@@ -31,6 +31,7 @@ Implementação: `src/bully.py` (issue #4). Testes: `tests/test_bully.py`. Usa o
   - Com duplicação (`NET_DUP_PROB`), uma chamada vira dois `send` no log da rede e gera dois OKs. Por isso, sob falhas, `msgs` não bate com os eventos `send`.
   - O custo de uma eleição é a soma dos `election_end` de todos os nós.
 - Log:
+  - `bully_start` (`timeout`), quando o Bully começa a rodar no nó;
   - `election_start` (`motivo`, `maiores`);
   - `leader` (`lider`), quando o nó decide um líder;
   - `election_end` (`lider`, `msgs`);
@@ -90,6 +91,7 @@ Implementação: `src/bully.py` (issue #4). Testes: `tests/test_bully.py`. Usa o
   - o nó 4 cai, e os nós 1 a 3 elegem o 3 dentro do limite, sem decidir outro;
   - o nó 4 volta e todos passam a ter o 4;
   - os `msgs` de `election_end` batem com os `send`/`recv` do log.
+- Verificador de logs (`analysis/log_verifier.py`, issue #5): confere em qualquer execução, inclusive no compose, o acordo (`bully.acordo`) e a convergência dentro do limite de tempo (`bully.convergencia`). Ver `docs/testes.md`.
 
 ## 5. Limitações
 

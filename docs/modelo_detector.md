@@ -9,7 +9,7 @@ Implementação: `src/detector.py` (issue #3). Testes: `tests/test_detector.py`.
 - A cada `intervalo`, uma thread de verificação confere cada peer: se está há mais de `timeout` (`HB_TIMEOUT`) sem mandar heartbeat, ele passa a ser **suspeito**; se era suspeito e voltou a mandar, é **restaurado**. Suspeitas e restaurações só acontecem nessa thread, então os eventos de um mesmo peer saem sempre em ordem.
 - No início, cada peer tem um prazo de `timeout` para mandar o primeiro heartbeat; um peer que nunca sobe também é suspeito.
 - API: `on_suspect(f)`, `on_restore(f)` (callbacks `f(peer_id)`, usados pelo Bully #4 e pela integração #8) e `vivos()`.
-- Log: `detector_start`, `suspect` (com `sem_heartbeat_s`), `restore`, `callback_error`. As mensagens aparecem como `send`/`recv`/`reply` com `msg="heartbeat"`.
+- Log: `detector_start` (com `intervalo`, `timeout` e `peers`), `suspect` (com `sem_heartbeat_s`), `restore`, `callback_error`. As mensagens aparecem como `send`/`recv`/`reply` com `msg="heartbeat"`.
 
 ## 2. Modelo do sistema
 
@@ -31,6 +31,7 @@ Implementação: `src/detector.py` (issue #3). Testes: `tests/test_detector.py`.
 - `test_suspeita_e_restauracao` (unitário): suspeita após `timeout`, não repete o aviso, restaura no heartbeat, sobrevive a callback com erro.
 - `test_rede_estavel_sem_falso_positivo`: 3 nós, 20 intervalos, nenhuma suspeita.
 - `test_crash_detectado_por_todos_e_recuperacao`: o nó 3 cai e é suspeito pelos nós 1 e 2 dentro de `timeout + intervalo` (com folga); ao voltar, é restaurado pelos dois.
+- Verificador de logs (`analysis/log_verifier.py`, issue #5): confere em qualquer execução, inclusive no compose, a segurança (`detector.suspeita_apos_timeout`, `detector.alternancia`), a completude com o limite de tempo (`detector.completude`) e a restauração (`detector.restauracao`). Ver `docs/testes.md`.
 
 ## 5. Limitações
 
