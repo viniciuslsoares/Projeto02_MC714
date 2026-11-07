@@ -8,7 +8,8 @@ from tests.test_infra import make_cluster
 
 @pytest.fixture
 def cluster_falhas(tmp_path):
-    nodes = make_cluster(tmp_path, n=3)
+    # rpc_timeout curto: envios sob partição ou perda esperam o timeout inteiro
+    nodes = make_cluster(tmp_path, n=3, rpc_timeout=0.1)
     yield nodes
     for n in nodes:
         n.stop()

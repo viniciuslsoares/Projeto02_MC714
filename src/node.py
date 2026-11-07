@@ -73,7 +73,15 @@ class Node:
         if handler is None:
             self.log.emit("unknown_msg", peer=msg.sender, msg=msg.type)
             return Message("error", self.id, self.clock.tick(), {"error": "unknown_type"})
-        resultado = handler(msg)
+        try:
+            resultado = handler(msg)
+        except Exception as erro:
+            # sem isso a exceção derruba a conexão e não aparece no log JSONL
+            self.log.emit("handler_error", peer=msg.sender, msg=msg.type,
+                          error=type(erro).__name__, detail=str(erro))
+            return Message("error", self.id, self.clock.tick(), {"error": "handler_exception"})
+        if resultado is None:
+            resultado = {}
         return Message("ok", self.id, self.clock.tick(), resultado)
 
     def handle_control(self, cmd):
@@ -176,7 +184,8 @@ class Node:
     def start(self):
         self.server = self.criar_servidor()
         self.spawn(self.server.serve_forever, "http")
-        self.log.emit("node_start", port=self.port, peers=sorted(self.cfg.peers), seed=self.cfg.seed)
+        self.log.emit("node_start", port=self.port, peers=sorted(self.cfg.peers), seed=self.cfg.seed,
+                      incarnation=self.log.incarnation)
         if self.cfg.ping_interval > 0:
             self.spawn(self.loop_ping, "ping")
 
