@@ -65,7 +65,41 @@ python -m experiments.run_all --grades cenarios                     # o mesmo qu
 
 ## 5. Resultados
 
-RESULTADOS
+Dados: `results/experimentos/cenarios.csv`, 5 execuções de cada cenário, geradas pelo `run_all` sobre o commit registrado no `.meta.json`, sem alterações locais. O ambiente está no `.meta.json` (Apple M2 Pro, macOS, CPython 3.14). Médias, intervalos de confiança e figuras ficam para a issue #9.
+
+| Cenário | Evento | Reconvergência (s): mediana (mín–máx) | Mais de um líder (s): mediana (mín–máx) | `[AVISO]` |
+|---|---|---|---|---|
+| `cascata_e_recuperacao` | `crash:3` | vazia (não converge antes do próximo evento) | 0,02 (0,02–0,03), até 2 líderes | nenhum |
+|  | `crash:2` | 1,00 (0,96–1,01) |  |  |
+|  | `recover:3` | 0,21 (0,16–0,35) |  |  |
+|  | `recover:2` | 0,19 (0,16–0,37) |  |  |
+| `particao_menor_id` | `partition:1` | vazia (não converge antes do próximo evento) | 4,03 (3,53–4,04), até 2 líderes | `bully.acordo` (5/5) |
+|  | `heal:1` | 0,99 (0,51–1,01) |  |  |
+| `particao_queda_e_perda` | `partition:3` | vazia (não converge antes do próximo evento) | 8,03 (7,54–8,05), até 2 líderes | `bully.acordo` (5/5) |
+|  | `crash:2` | vazia (não converge antes do próximo evento) |  |  |
+|  | `reset_faults:todos` | 0,55 (0,08–0,58) |  |  |
+|  | `recover:2` | 0,22 (0,19–0,38) |  |  |
+| `particao_rede` | `partition:3` | vazia (não converge antes do próximo evento) | 3,02 (2,03–3,03), até 2 líderes | `bully.acordo` (5/5) |
+|  | `heal:3` | 0,99 (0,54–1,00) |  |  |
+| `queda_e_recuperacao` | `recover:2` | 0,20 (0,18–0,22) | 0,00 (0,00–0,00), até 1 líder | nenhum |
+
+- **Recuperação** (`recover`): de 0,16 a 0,38 s, do comando até todos terem o maior vivo como líder.
+  - Quase todo esse tempo é a subida do processo Python. A eleição do nó que volta leva poucos ms: sem líder, ele manda `ELECTION` aos maiores, recebe OK e espera o `COORDINATOR`; ou, se for o maior, vence e anuncia.
+  - Nas voltas do maior ID (o 3 na cascata), há dois líderes por uns 20 ms, até o `COORDINATOR` chegar (`docs/modelo_bully.md` §5).
+- **Cascata:** a reconvergência é medida a partir da segunda queda, que vem 1 s depois da primeira. Os cerca de 1,0 s medidos somam 2,0 s desde a primeira queda, o tempo de detecção (`HB_TIMEOUT`).
+  - O nó 1 suspeita do 3 e faz uma eleição. O 2 já caiu e recusa a conexão na hora, então o 1 vence sem esperar o timeout.
+  - A segunda queda não custou mais tempo.
+- **Partição:** sempre houve dois líderes, e o `bully.acordo` deu `[AVISO]` em todas as execuções.
+  - **Duração dos dois líderes:** é aproximadamente a duração da partição, menos o tempo até o lado sem o maior ID se eleger, mais a reconvergência depois da cura. O lado sem o maior ID se elege depois da detecção (cerca de 2 s) e do `RPC_TIMEOUT` do `ELECTION` que a partição descarta (1 s).
+    - `particao_rede`: 5 s de partição, 3 s com dois líderes.
+    - `particao_menor_id`: 6 s de partição, 4 s com dois líderes.
+  - **Reconvergência depois da cura:** de 0,5 a 1,0 s. É o tempo de o detector restaurar o peer: o primeiro heartbeat depois da cura, até um `HB_INTERVAL`, mais a verificação seguinte, até outro. A eleição que vem depois leva cerca de 10 ms.
+- **Combinado:** dois períodos com dois líderes, primeiro 2 e 3 e depois 1 e 3, somando cerca de 8 s.
+  - A queda do 2 durante a partição não converge até a cura, porque o lado 1–2 não tem como saber do 3.
+  - Depois do `reset_faults`, que cura a partição e acaba com a perda, a convergência sai em até 0,6 s. O verificador a confere com o prazo normal, e só o `bully.acordo` dá `[AVISO]`.
+- **Perda contínua:** numa versão anterior do cenário combinado, a perda começava aos 2 s e continuava depois da cura. Essas rodadas de validação ficaram fora do repositório.
+  - Às vezes o nó 1 não recebia o OK do 2 e se elegia, e chegou a haver 3 líderes ao mesmo tempo.
+  - Numa das execuções, um `COORDINATOR` perdido duas vezes deixou o nó 1 se achando líder por cerca de 5 s depois da cura. Com perda, a convergência acontece, mas sem limite de tempo (`docs/modelo_bully.md` §3). O cenário foi mudado para que a queda seja mesmo a do líder do lado 1–2 (§3).
 
 ## 6. O que se mantém e o que é violado
 

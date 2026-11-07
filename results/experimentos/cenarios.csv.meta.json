@@ -1,0 +1,207 @@
+{
+  "completa": true,
+  "comando": "python -m experiments.run_all --grades cenarios",
+  "git_commit": "941e80bd6498d0956ed1c6b28af86b5cd2daacd2",
+  "git_alteracoes_locais": false,
+  "inicio_utc": "2026-11-07T22:20:11+00:00",
+  "fim_utc": "2026-11-07T22:29:06+00:00",
+  "duracao_total_s": 535.2,
+  "repeticoes": 5,
+  "parametros": {
+    "n": 3,
+    "hb_intervalo": 0.5,
+    "hb_timeout": 2.0,
+    "rpc_timeout": 1.0
+  },
+  "execucao": {
+    "aquecimento_s": 2.0,
+    "crash": "SIGKILL do processo",
+    "recover": "processo novo, mesma porta e mesmo log",
+    "rede": "partição, cura e perda pelo /control do nó (FaultInjector, issue #2)"
+  },
+  "cenarios": {
+    "scenarios/cascata_e_recuperacao.yaml": {
+      "name": "cascata_e_recuperacao",
+      "description": "Líder e próximo líder caem em sequência e depois voltam, um de cada vez",
+      "duration_s": 22.0,
+      "seed": 1003,
+      "events": [
+        {
+          "time_s": 3.0,
+          "action": "crash",
+          "node": 3
+        },
+        {
+          "time_s": 4.0,
+          "action": "crash",
+          "node": 2
+        },
+        {
+          "time_s": 10.0,
+          "action": "recover",
+          "node": 3
+        },
+        {
+          "time_s": 16.0,
+          "action": "recover",
+          "node": 2
+        }
+      ]
+    },
+    "scenarios/particao_menor_id.yaml": {
+      "name": "particao_menor_id",
+      "description": "Isola o nó 1 dos nós 2 e 3 e cura a partição: o nó isolado se declara líder",
+      "duration_s": 15.0,
+      "seed": 1004,
+      "events": [
+        {
+          "time_s": 3.0,
+          "action": "partition",
+          "nodes": [
+            2,
+            3
+          ],
+          "target": 1
+        },
+        {
+          "time_s": 9.0,
+          "action": "heal",
+          "nodes": [
+            2,
+            3
+          ],
+          "target": 1
+        }
+      ]
+    },
+    "scenarios/particao_queda_e_perda.yaml": {
+      "name": "particao_queda_e_perda",
+      "description": "Partição do líder, perda de 20% e queda do líder do outro lado durante a partição",
+      "duration_s": 27.0,
+      "seed": 1005,
+      "events": [
+        {
+          "time_s": 3.0,
+          "action": "partition",
+          "nodes": [
+            1,
+            2
+          ],
+          "target": 3
+        },
+        {
+          "time_s": 8.0,
+          "action": "set_faults",
+          "node": 1,
+          "drop_prob": 0.2
+        },
+        {
+          "time_s": 8.0,
+          "action": "set_faults",
+          "node": 2,
+          "drop_prob": 0.2
+        },
+        {
+          "time_s": 8.0,
+          "action": "set_faults",
+          "node": 3,
+          "drop_prob": 0.2
+        },
+        {
+          "time_s": 10.0,
+          "action": "crash",
+          "node": 2
+        },
+        {
+          "time_s": 16.0,
+          "action": "reset_faults"
+        },
+        {
+          "time_s": 21.0,
+          "action": "recover",
+          "node": 2
+        }
+      ]
+    },
+    "scenarios/particao_rede.yaml": {
+      "name": "particao_rede",
+      "description": "Isola o nó 3 dos nós 1 e 2 temporariamente e restaura a conectividade",
+      "duration_s": 15.0,
+      "seed": 1001,
+      "events": [
+        {
+          "time_s": 3.0,
+          "action": "partition",
+          "nodes": [
+            1,
+            2
+          ],
+          "target": 3
+        },
+        {
+          "time_s": 8.0,
+          "action": "heal",
+          "nodes": [
+            1,
+            2
+          ],
+          "target": 3
+        }
+      ]
+    },
+    "scenarios/queda_e_recuperacao.yaml": {
+      "name": "queda_e_recuperacao",
+      "description": "Simula crash e retorno do nó 2 com atraso temporário no nó 1",
+      "duration_s": 14.0,
+      "seed": 1002,
+      "events": [
+        {
+          "time_s": 3.0,
+          "action": "crash",
+          "node": 2
+        },
+        {
+          "time_s": 5.0,
+          "action": "set_faults",
+          "node": 1,
+          "delay_ms": 100.0,
+          "jitter_ms": 20.0
+        },
+        {
+          "time_s": 8.0,
+          "action": "recover",
+          "node": 2
+        },
+        {
+          "time_s": 11.0,
+          "action": "reset_faults",
+          "node": 1
+        }
+      ]
+    }
+  },
+  "ambiente": {
+    "so": "macOS-26.7.1-arm64-arm-64bit-Mach-O",
+    "maquina": "arm64",
+    "cpu": "Apple M2 Pro",
+    "cpus": 10,
+    "memoria_gb": 16.0,
+    "python": "CPython 3.14.4",
+    "execucao": "um processo por nó (python -m src.node), todos em 127.0.0.1 na mesma máquina"
+  },
+  "colunas": {
+    "cenario": "nome do cenário (campo name do YAML)",
+    "repeticao": "número da repetição (1, 2, ...)",
+    "seed": "SEED dos nós: a do YAML + repetição - 1 (cada nó usa SEED * 1000 + NODE_ID)",
+    "n": "número de nós",
+    "hb_intervalo": "HB_INTERVAL (s)",
+    "hb_timeout": "HB_TIMEOUT (s)",
+    "rpc_timeout": "RPC_TIMEOUT (s)",
+    "duracao_s": "duração total da execução, da subida dos processos ao fim (s)",
+    "eventos": "eventos do cenário na ordem, como ação:nó (o nó isolado, na partição e na cura), separados por ';'",
+    "reconvergencia_s": "para cada evento, tempo até o início do último trecho, antes do próximo evento, em que todos os vivos têm o maior vivo como líder (s), separados por ';'; vazio = não convergiu antes do próximo evento (ex.: durante uma partição)",
+    "lideres_max": "maior número de nós vivos que se acharam líderes ao mesmo tempo, durante o cenário",
+    "dois_lideres_s": "tempo com mais de um nó se achando líder, durante o cenário (s)",
+    "avisos_verificador": "propriedades com [AVISO] no analysis.log_verifier, separadas por ';'"
+  }
+}
