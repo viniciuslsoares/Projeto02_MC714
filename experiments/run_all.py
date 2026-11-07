@@ -1,11 +1,12 @@
-# Porta de entrada única dos experimentos (issue #6): roda todas as grades e grava os
-# CSVs brutos e os metadados em results/experimentos/.
+# Porta de entrada única dos experimentos (issues #6 e #7): roda todas as grades e os cenários
+# de falha e grava os CSVs brutos e os metadados em results/experimentos/.
 #
-# Uso (da raiz do repositório; só precisa da biblioteca padrão do Python):
-#   python -m experiments.run_all                     # todas as grades, 10 repetições (~23 min)
+# Uso (da raiz do repositório; precisa só da biblioteca padrão e do pyyaml, para os cenários):
+#   python -m experiments.run_all                     # tudo: grades com 10 repetições, cenários com 5 (~33 min)
 #   python -m experiments.run_all --grades nos --repeticoes 2
-# Os logs de cada ensaio ficam em results/raw/experimentos/<grade>/ (fora do git).
-# O que cada grade mede e como: docs/experimentos.md.
+#   python -m experiments.run_all --grades cenarios   # só os cenários (~9 min)
+# Os logs de cada ensaio ficam em results/raw/ (fora do git).
+# O que cada grade mede e como: docs/experimentos.md; os cenários: docs/cenarios.md.
 import argparse
 import signal
 import sys
@@ -22,9 +23,10 @@ GRADES = [
 
 def main(argv=None):
     p = argparse.ArgumentParser(description="Roda as grades de experimentos e grava os CSVs brutos")
-    p.add_argument("--grades", nargs="+", choices=[g.nome for g in GRADES],
-                   default=[g.nome for g in GRADES])
-    p.add_argument("--repeticoes", type=int, default=None, help="padrão: o de cada grade (10)")
+    nomes = [g.nome for g in GRADES] + ["cenarios"]
+    p.add_argument("--grades", nargs="+", choices=nomes, default=nomes)
+    p.add_argument("--repeticoes", type=int, default=None,
+                   help="padrão: 10 em cada grade e 5 nos cenários")
     p.add_argument("--saida", default="results/experimentos")
     args = p.parse_args(argv)
     # SIGTERM (kill) vira SystemExit: os ensaios param os nós e gravam o que já rodou
@@ -35,6 +37,10 @@ def main(argv=None):
                 g.repeticoes = args.repeticoes
             r = execute_grid(g, saida=args.saida)
             print(f"[{g.nome}] {len(r.linhas)} ensaios -> {r.csv} (+ .meta.json)")
+    if "cenarios" in args.grades:
+        from experiments import cenarios   # aqui: só os cenários precisam do pyyaml
+        linhas = cenarios.executar(repeticoes=args.repeticoes or 5, saida=args.saida)
+        print(f"[cenarios] {len(linhas)} execuções -> {args.saida}/cenarios.csv (+ .meta.json)")
 
 
 if __name__ == "__main__":

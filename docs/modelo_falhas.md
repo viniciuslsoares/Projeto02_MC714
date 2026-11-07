@@ -59,6 +59,10 @@ events:
     target: 3
 ```
 
+Cenários do repositório:
+- da issue #2: `particao_rede.yaml` e `queda_e_recuperacao.yaml`;
+- da issue #7 (recuperação, partição e falhas combinadas): `cascata_e_recuperacao.yaml`, `particao_menor_id.yaml` e `particao_queda_e_perda.yaml`. Descrição, métricas, resultados e o que cada um viola: `docs/cenarios.md`.
+
 ---
 
 ## 4. Limitações do Ambiente Experimental
@@ -90,6 +94,8 @@ Para executar um cenário com o cluster Docker ativo e gravar os resultados com 
 ```
 
 Os logs gerados de cada nó e o arquivo `meta.json` com os metadados de proveniência (commit Git, semente e timestamp) são armazenados em `results/raw/<cenario>_seed<SEED>/`.
+
+Sem Docker, `python -m experiments.cenarios` roda os mesmos cenários com um processo por nó em 127.0.0.1: o `FaultInjector` comanda partição e perda pelo `/control` e, pelos callbacks `on_crash`/`on_recover`, mata o processo (SIGKILL) e sobe um novo. O resultado de cada execução vai para `results/experimentos/cenarios.csv` (`docs/cenarios.md`).
 
 ---
 

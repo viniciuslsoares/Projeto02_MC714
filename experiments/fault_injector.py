@@ -35,6 +35,7 @@ class FaultInjector:
         self.modo_docker = modo_docker
         self.on_crash = on_crash
         self.on_recover = on_recover
+        self.instantes = []     # time.time() de cada evento executado por run(), na ordem
 
     def enviar_comando(self, node_id, cmd):
         # Envia requisição POST para o /control do nó
@@ -128,12 +129,14 @@ class FaultInjector:
 
         print(f"=== Iniciando Cenário: {nome} (duração: {duracao}s) ===")
         t_inicio = time.time()
+        self.instantes = []
 
         for ev in eventos:
             t_alvo = float(ev.get("time_s", 0.0))
             espera = t_alvo - (time.time() - t_inicio)
             if espera > 0:
                 time.sleep(espera)
+            self.instantes.append(time.time())
             self.executar_evento(ev)
 
         # Aguarda o restante da duração total do cenário

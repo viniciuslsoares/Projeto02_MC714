@@ -1,0 +1,19 @@
+# Cenário de partição que isola o nó de menor ID (issue #7)
+# O nó 1 fica isolado dos nós 2 e 3 dos 3 s aos 9 s. Os nós 2 e 3 continuam com o líder 3; o
+# nó 1, sozinho, suspeita dos outros dois e se elege: dois líderes ao mesmo tempo (split-brain).
+# Compare com particao_rede.yaml, em que o isolado é o líder e o outro lado elege o nó 2.
+name: "particao_menor_id"
+description: "Isola o nó 1 dos nós 2 e 3 e cura a partição: o nó isolado se declara líder"
+duration_s: 15.0
+seed: 1004
+
+events:
+  - time_s: 3.0
+    action: "partition"
+    nodes: [2, 3]
+    target: 1
+
+  - time_s: 9.0
+    action: "heal"
+    nodes: [2, 3]
+    target: 1

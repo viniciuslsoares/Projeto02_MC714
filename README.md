@@ -20,13 +20,14 @@ Docker + Docker Compose v2, Python ≥ 3.12 (testes), bash (WSL/Git Bash no Wind
 python -m pip install -r requirements.txt
 python -m pytest              # testes automatizados (docs/testes.md)
 python -m analysis.log_verifier [pasta]  # verifica safety/liveness nos logs -> results/verifications.txt
-python -m experiments.run_all  # roda todos os experimentos -> results/experimentos/*.csv (docs/experimentos.md)
+python -m experiments.run_all  # roda todos os experimentos e cenários -> results/experimentos/*.csv (docs/experimentos.md)
+python -m experiments.cenarios # só os cenários de recuperação, partição e falhas combinadas (docs/cenarios.md)
 ```
 Logs estruturados (JSONL, um arquivo por nó) ficam em `results/logs/node<ID>.jsonl`.
 Resultados de cenários com metadados ficam em `results/raw/<cenario>_seed<SEED>/`.
 Dados brutos dos experimentos (versionados): `results/experimentos/<grade>.csv` e `<grade>.csv.meta.json`.
 
-## Arquitetura e Falhas (issues #1 a #6)
+## Arquitetura e Falhas (issues #1 a #7)
 | Arquivo | Papel |
 |---|---|
 | `src/config.py` | Configuração via variáveis de ambiente (id, peers, porta, seed, timeouts, falhas de rede) |
@@ -35,7 +36,7 @@ Dados brutos dos experimentos (versionados): `results/experimentos/<grade>.csv` 
 | `src/network.py` | Transporte HTTP/JSON com **timeout obrigatório**; perda, atraso, duplicação e partição injetáveis (RNG semeado) |
 | `src/node.py` | Nó genérico: servidor HTTP, rotas `/msg`, `/control` (falhas dinâmicas), persistência de estado e healthcheck |
 | `experiments/fault_injector.py` | Injetor programático que lê cenários em YAML e comanda partições, atrasos e crashes |
-| `scenarios/` | Cenários declarativos reproduzíveis (`particao_rede.yaml`, `queda_e_recuperacao.yaml`) |
+| `scenarios/` | Cenários declarativos reproduzíveis: `particao_rede.yaml` e `queda_e_recuperacao.yaml` (#2); `cascata_e_recuperacao.yaml`, `particao_menor_id.yaml` e `particao_queda_e_perda.yaml` (#7) |
 | `scripts/run_scenario.sh` | Runner automatizado para subir cluster, rodar cenário, coletar logs e salvar metadados |
 | `docs/modelo_falhas.md` | Documentação formal das hipóteses de falhas, técnica adotada e limitações do ambiente |
 | `src/detector.py` | Detector de falhas por heartbeat (#3): suspeita/restauração e callbacks `on_suspect`/`on_restore`; modelo em `docs/modelo_detector.md` |
@@ -45,6 +46,8 @@ Dados brutos dos experimentos (versionados): `results/experimentos/<grade>.csv` 
 | `experiments/grid.py` | Grade de experimentos (#6): `execute_grid(GridConfig)` roda ensaios com um processo por nó, derruba o líder e mede detecção, falsos positivos, heartbeats/s, convergência e mensagens do Bully; grava CSV + `.csv.meta.json` |
 | `experiments/run_all.py` | Porta de entrada única dos experimentos: grades `nos` (n = 3, 5, 7, 9) e `perda` (0 a 0,3) |
 | `docs/experimentos.md` | Roteiro de um ensaio, grades, definição de cada métrica, metadados e limitações |
+| `experiments/cenarios.py` | Cenários de falha (#7): roda cada `scenarios/*.yaml` com o injetor da #2 e um processo por nó; mede reconvergência depois de cada evento, tempo de recuperação e split-brain (nós que se acham líderes ao mesmo tempo); grava `results/experimentos/cenarios.csv` + `.meta.json` |
+| `docs/cenarios.md` | Cenários de recuperação, partição e falhas combinadas: métricas, resultados, o que se mantém e o que é violado, limitações |
 
 Algoritmos registram handlers com `node.register("TIPO", fn)` e enviam com `node.net.send(peer, "TIPO", payload, timeout)`.
 
@@ -64,4 +67,4 @@ NET_DELAY_MS, NET_JITTER_MS, NET_DUP_PROB` (detalhes em `src/config.py`). O `com
 `SEED` é a semente do experimento (a registrada no `meta.json`); cada nó usa a sua própria, `SEED * 1000 + NODE_ID`, para que as falhas sorteadas sejam independentes entre nós.
 
 ## Reprodução completa e relatório
-Testes e verificação: `docs/testes.md`. Experimentos: `python -m experiments.run_all` refaz todos os CSVs brutos (`docs/experimentos.md`). Relatório: issue #9.
+Testes e verificação: `docs/testes.md`. Experimentos e cenários: `python -m experiments.run_all` refaz todos os CSVs brutos (`docs/experimentos.md`, `docs/cenarios.md`). Relatório: issue #9.
