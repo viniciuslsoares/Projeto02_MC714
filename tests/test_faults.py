@@ -18,7 +18,7 @@ def cluster_falhas(tmp_path):
 def test_carregar_cenarios_declarativos():
     c1 = carregar_cenario("scenarios/particao_rede.yaml")
     assert c1["name"] == "particao_rede"
-    assert c1["duration_s"] == 12.0
+    assert c1["duration_s"] == 15.0
     assert len(c1["events"]) == 2
 
     c2 = carregar_cenario("scenarios/queda_e_recuperacao.yaml")

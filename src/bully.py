@@ -19,8 +19,8 @@
 #   - chegou ELECTION de um nó menor, ou COORDINATOR de um nó menor (o "valentão"
 #     não aceita um líder menor que ele: faz a própria eleição e toma o lugar).
 #
-# Log: "election_start" (motivo), "leader" (lider) quando o nó decide um líder,
-# "election_end" (lider, msgs) e "coordinator_rejected". Contador de mensagens:
+# Log: "bully_start" (timeout), "election_start" (motivo), "leader" (lider) quando o nó
+# decide um líder, "election_end" (lider, msgs) e "coordinator_rejected". Contador de mensagens:
 # o `msgs` de "election_end" diz quantas ELECTION, OK e COORDINATOR este nó enviou
 # nessa eleição; o total de uma eleição é a soma dos "election_end" de todos os nós.
 #
@@ -52,6 +52,7 @@ class Bully:
         detector.on_restore(lambda peer: self.acordar.set())
 
     def start(self):
+        self.node.log.emit("bully_start", timeout=self.timeout)
         self.node.spawn(self.loop, "bully")
 
     def loop(self):

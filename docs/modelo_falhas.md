@@ -44,7 +44,7 @@ Os cenários são especificados em arquivos declarativos na pasta `scenarios/`:
 Exemplo:
 ```yaml
 name: "particao_rede"
-duration_s: 12.0
+duration_s: 15.0
 seed: 1001
 
 events:
