@@ -29,7 +29,7 @@ Resultados de cenários com metadados ficam em `results/raw/<cenario>_seed<SEED>
 |---|---|
 | `src/config.py` | Configuração via variáveis de ambiente (id, peers, porta, seed, timeouts, falhas de rede) |
 | `src/models.py` | `Message` e `LogEvent` |
-| `src/eventlog.py` | Relógio de Lamport + log JSONL thread-safe |
+| `src/eventlog.py` | Relógio de Lamport + log JSONL thread-safe; após reinício o relógio é retomado do maior `clock` do log (nunca volta) |
 | `src/network.py` | Transporte HTTP/JSON com **timeout obrigatório**; perda, atraso, duplicação e partição injetáveis (RNG semeado) |
 | `src/node.py` | Nó genérico: servidor HTTP, rotas `/msg`, `/control` (falhas dinâmicas), persistência de estado e healthcheck |
 | `experiments/fault_injector.py` | Injetor programático que lê cenários em YAML e comanda partições, atrasos e crashes |

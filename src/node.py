@@ -176,7 +176,8 @@ class Node:
     def start(self):
         self.server = self.criar_servidor()
         self.spawn(self.server.serve_forever, "http")
-        self.log.emit("node_start", port=self.port, peers=sorted(self.cfg.peers), seed=self.cfg.seed)
+        self.log.emit("node_start", port=self.port, peers=sorted(self.cfg.peers), seed=self.cfg.seed,
+                      incarnation=self.log.incarnation)
         if self.cfg.ping_interval > 0:
             self.spawn(self.loop_ping, "ping")
 
