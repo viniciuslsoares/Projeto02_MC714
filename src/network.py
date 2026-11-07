@@ -27,7 +27,8 @@ class Network:
         self.log = log
         self.default_timeout = default_timeout
         self.faults = faults if faults is not None else NetFaults()
-        self.rng = random.Random(seed)
+        self.seed = seed
+        self.rngs = {}               # um gerador por enlace (peer de destino)
         self.bloqueados = set()      # peers "isolados" (partição simulada)
         self.lock = threading.Lock()
 
@@ -69,10 +70,15 @@ class Network:
                 "dup_prob": self.faults.dup_prob,
             }
 
-    def sorteio(self):
-        # número aleatório entre 0 e 1 (com lock porque várias threads enviam)
+    def sorteio(self, peer_id):
+        # número aleatório entre 0 e 1 do enlace até peer_id (com lock porque várias
+        # threads enviam). Cada enlace tem seu próprio gerador, criado na primeira vez:
+        # assim o tráfego para um peer não muda os sorteios dos outros. A semente em
+        # string é determinística no Python 3 (hash() não serviria: muda a cada processo).
         with self.lock:
-            return self.rng.random()
+            if peer_id not in self.rngs:
+                self.rngs[peer_id] = random.Random(f"{self.seed}:{peer_id}")
+            return self.rngs[peer_id].random()
 
     # --- envio ---
     def send(self, peer_id, msg_type, payload=None, timeout=None):
@@ -93,20 +99,20 @@ class Network:
             return None
 
         # perda de mensagem simulada
-        if faults.drop_prob > 0 and self.sorteio() < faults.drop_prob:
+        if faults.drop_prob > 0 and self.sorteio(peer_id) < faults.drop_prob:
             self.log.emit("drop", peer=peer_id, msg=msg_type, reason="loss")
             return None
 
         # atraso simulado
         atraso = faults.delay_ms
         if faults.jitter_ms > 0:
-            atraso = atraso + self.sorteio() * faults.jitter_ms
+            atraso = atraso + self.sorteio(peer_id) * faults.jitter_ms
         if atraso > 0:
             time.sleep(atraso / 1000)
 
         # duplicação: manda a mesma mensagem duas vezes
         vezes = 1
-        if faults.dup_prob > 0 and self.sorteio() < faults.dup_prob:
+        if faults.dup_prob > 0 and self.sorteio(peer_id) < faults.dup_prob:
             vezes = 2
 
         resposta = None
