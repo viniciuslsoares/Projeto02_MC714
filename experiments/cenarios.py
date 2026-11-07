@@ -25,6 +25,7 @@ import os
 import shutil
 import signal
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -61,8 +62,9 @@ def rotulo(evento):
     return f"{evento['action']}:{alvo}"
 
 
-def rodar_cenario(cenario, seed, pasta, aquecimento_s=AQUECIMENTO_S, limite_s=60.0, **params):
-    # devolve o início e o fim do cenário e o instante (time.time) de cada evento
+def rodar_cenario(cenario, seed, pasta, aquecimento_s=AQUECIMENTO_S, limite_s=60.0, junto=None, **params):
+    # devolve o início e o fim do cenário e o instante (time.time) de cada evento. `junto`
+    # (opcional) roda numa thread durante o cenário, com as portas dos nós: o cliente da #8
     params = {**PARAMS, **params}
     shutil.rmtree(pasta, ignore_errors=True)
     os.makedirs(pasta)
@@ -84,7 +86,12 @@ def rodar_cenario(cenario, seed, pasta, aquecimento_s=AQUECIMENTO_S, limite_s=60
         injetor = FaultInjector({i: f"127.0.0.1:{p}" for i, p in portas.items()}, modo_docker=False,
                                 on_crash=derrubar, on_recover=subir)
         t_ini = time.time()
+        carga = threading.Thread(target=junto, args=(portas,), daemon=True) if junto else None
+        if carga:
+            carga.start()
         injetor.run(cenario)            # no fim, reset_faults em todos os nós
+        if carga:
+            carga.join()
         t_fim = time.time()
     finally:
         parar(procs)

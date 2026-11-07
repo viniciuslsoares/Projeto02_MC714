@@ -7,9 +7,9 @@ case "${1:-}" in
   build) docker compose build ;;
   up)    mkdir -p results/logs && docker compose up -d --wait ;;
   up5)   mkdir -p results/logs && PEERS="1=node1:8000,2=node2:8000,3=node3:8000,4=node4:8000,5=node5:8000" docker compose --profile n5 up -d --wait ;;
-  ps)    docker compose --profile n5 ps ;;
-  logs)  docker compose --profile n5 logs --no-color "${@:2}" ;;
-  down)  docker compose --profile n5 down -v ;;
+  ps)    docker compose --profile n5 --profile integracao ps ;;
+  logs)  docker compose --profile n5 --profile integracao logs --no-color "${@:2}" ;;
+  down)  docker compose --profile n5 --profile integracao down -v ;;
   smoke) # sobe 3 nós, espera pings entre todos e derruba
     mkdir -p results/logs
     docker compose up -d --build --wait

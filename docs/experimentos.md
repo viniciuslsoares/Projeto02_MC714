@@ -1,11 +1,11 @@
 # Experimentos
 
-Implementação: `experiments/grid.py` e `experiments/run_all.py` (issue #6). As tabelas e figuras saem dos CSVs na issue #9 (`analysis/analise.py`). O `run_all` também roda os cenários de falha da issue #7 (`docs/cenarios.md`).
+Implementação: `experiments/grid.py` e `experiments/run_all.py` (issue #6). As tabelas e figuras saem dos CSVs na issue #9 (`analysis/analise.py`). O `run_all` também roda os cenários de falha da issue #7 (`docs/cenarios.md`) e o serviço de tarefas da issue #8 (`docs/integracao.md`).
 
 ## 1. Como rodar
 
 ```bash
-python -m experiments.run_all                               # grades (10 repetições, ~23 min) e cenários (5, ~10 min)
+python -m experiments.run_all                               # grades (10 repetições, ~23 min), cenários (5, ~10 min) e integração (5, ~6 min)
 python -m experiments.run_all --grades nos --repeticoes 2   # rodada curta, para conferir
 python -m experiments.run_all --grades nos perda            # só as grades
 ```

@@ -1,0 +1,19 @@
+# Serviço de tarefas (issue #8), cenário de falha: 30 s de carga com a queda e a volta de um
+# worker e, depois, do líder. Com 3 nós, o 3 é o líder e o 1 e o 2 são os workers.
+# Roda com o cliente gerando carga (python -m experiments.integracao, docs/integracao.md).
+name: "integracao_quedas"
+duration_s: 30.0
+seed: 1007
+events:
+  - time_s: 5.0
+    action: "crash"       # worker: o líder reatribui as tarefas dele ao outro worker
+    node: 1
+  - time_s: 10.0
+    action: "recover"     # o worker volta e recebe tarefas de novo
+    node: 1
+  - time_s: 15.0
+    action: "crash"       # líder: o 2 é eleito, e o cliente reenvia as tarefas a ele
+    node: 3
+  - time_s: 22.0
+    action: "recover"     # o 3 volta e retoma a liderança (Bully)
+    node: 3

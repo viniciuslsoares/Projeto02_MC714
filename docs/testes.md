@@ -11,6 +11,7 @@ Implementação: `tests/` e `analysis/log_verifier.py` (issue #5). As propriedad
   - `test_log_verifier::test_violacao_deliberada_e_detectada` (verificador com logs sintéticos).
   - `test_experimentos::test_medir_com_log_sintetico` (métricas dos experimentos com um log sintético).
   - `test_cenarios::test_cenarios_do_repositorio_sao_validos` (os YAML de `scenarios/`).
+  - `test_integracao::test_despachante` (handlers do serviço de tarefas) e `test_integracao::test_verificador_tarefas` (propriedades da aplicação com logs sintéticos).
 - **Integração:** vários nós reais trocando mensagens HTTP.
   - No pytest (local e CI), com os nós em threads e portas livres em 127.0.0.1:
     - `test_sanity`;
@@ -20,6 +21,7 @@ Implementação: `tests/` e `analysis/log_verifier.py` (issue #5). As propriedad
     - `test_bully::test_cenario_normal_lider_e_o_maior_id`.
     - `test_experimentos::test_grade_com_processos_reais` (uma grade pequena, com um processo por nó, grava o CSV e o `.meta.json`).
     - `test_cenarios::test_cenario_com_processos_reais` (um cenário pequeno com partição, cura, crash e retorno, pelo injetor da #2, com um processo por nó).
+    - `test_integracao::test_integracao_com_processos_reais` (o serviço de tarefas com carga e quedas de worker e de líder, com um processo por nó).
   - No compose (Docker, rodado à mão): `./scripts/env.sh smoke`; ou `./scripts/env.sh up` e, depois, `python -m analysis.log_verifier` sobre `results/logs`.
 - **Falhas:** crash, perda, atraso, duplicação e partição injetados.
   - No pytest:
@@ -40,6 +42,7 @@ Implementação: `tests/` e `analysis/log_verifier.py` (issue #5). As propriedad
 | Detector | `test_rede_estavel_sem_falso_positivo` | `test_crash_detectado_por_todos_e_recuperacao` |
 | Bully | `test_cenario_normal_lider_e_o_maior_id` | `test_lider_cai_novo_lider_e_anunciado_e_maior_id_volta` |
 | Os dois, com o verificador | `test_sanity` | `test_execucao_real_com_crash_e_retorno_sem_avisos` |
+| Serviço de tarefas (#8) | `test_despachante` (unitário); com carga, o cenário `integracao_normal` de `experiments.integracao` | `test_integracao_com_processos_reais`; com carga, o cenário `integracao_quedas` |
 
 ## 3. Verificador de logs
 
@@ -63,6 +66,7 @@ Implementação: `tests/` e `analysis/log_verifier.py` (issue #5). As propriedad
 | `bully.acordo` | segurança | Todo `leader` decide um líder L maior ou igual a todo nó que ficou vivo durante toda a eleição de L, do último `election_start` de L até a decisão. Um nó que sobe ou cai no meio da eleição fica de fora, como no modelo. |
 | `bully.convergencia` | vivacidade | Depois que um nó sobe ou cai (início ou fim de uma vida), ou que uma falha de rede termina (`partition_end`, `faults_reset`), todos os vivos têm o maior vivo como líder ao fim do prazo `HB_TIMEOUT + HB_INTERVAL + 2 × RPC_TIMEOUT + folga`. Se antes do prazo outro nó sobe ou cai, ou uma falha de rede começa (`partition_start`, `faults_updated`), a cobrança é conferida um instante antes disso e só é descartada se ainda não tinha convergido (contada como "não conferida"). Durante uma partição ou perda ligadas pelo `/control` não há cobrança: um nó que sobe ou cai nesse período não abre cobrança, e a cura abre outra (issue #7). Atraso e duplicação continuam cobrados. O `[OK]` mostra o maior tempo até convergir. |
 
+- Serviço de tarefas (issue #8): quando há tarefas nos logs, o verificador lê também o `cliente.jsonl` da pasta e confere `tarefas.execucao` (vivacidade) e `tarefas.um_lider` (segurança). Definições em `docs/integracao.md` §4.
 - Os parâmetros vêm do próprio log: `intervalo`, `timeout` e `peers` vêm do `detector_start`, e o `RPC_TIMEOUT` vem do `bully_start`.
 - Tolerâncias:
   - `folga` (0,5 s, opção `--folga`): atraso de escalonamento das threads admitido nos prazos de vivacidade.
