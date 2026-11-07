@@ -23,7 +23,7 @@ python -m pytest              # testes automatizados
 Logs estruturados (JSONL, um arquivo por nó) ficam em `results/logs/node<ID>.jsonl`.
 Resultados de cenários com metadados ficam em `results/raw/<cenario>_seed<SEED>/`.
 
-## Arquitetura e Falhas (issues #1 e #2)
+## Arquitetura e Falhas (issues #1, #2 e #3)
 | Arquivo | Papel |
 |---|---|
 | `src/config.py` | Configuração via variáveis de ambiente (id, peers, porta, seed, timeouts, falhas de rede) |
@@ -35,6 +35,7 @@ Resultados de cenários com metadados ficam em `results/raw/<cenario>_seed<SEED>
 | `scenarios/` | Cenários declarativos reproduzíveis (`particao_rede.yaml`, `queda_e_recuperacao.yaml`) |
 | `scripts/run_scenario.sh` | Runner automatizado para subir cluster, rodar cenário, coletar logs e salvar metadados |
 | `docs/modelo_falhas.md` | Documentação formal das hipóteses de falhas, técnica adotada e limitações do ambiente |
+| `src/detector.py` | Detector de falhas por heartbeat (#3): suspeita/restauração e callbacks `on_suspect`/`on_restore`; modelo em `docs/modelo_detector.md` |
 
 Algoritmos registram handlers com `node.register("TIPO", fn)` e enviam com `node.net.send(peer, "TIPO", payload, timeout)`.
 
@@ -47,8 +48,8 @@ do nó ⇒ reprodutíveis (com limites). Contêineres numa só máquina **não**
 Detalhes em [`docs/modelo_falhas.md`](docs/modelo_falhas.md) §6 (canal) e §7 (limitações conhecidas).
 
 ### Variáveis de ambiente
-`NODE_ID, PEERS, PORT, SEED, LOG_DIR, RPC_TIMEOUT, PING_INTERVAL, NET_DROP_PROB, NET_DELAY_MS,
-NET_JITTER_MS, NET_DUP_PROB` (detalhes em `src/config.py`). O `compose.yaml` aceita as mesmas via `.env`/shell.
+`NODE_ID, PEERS, PORT, SEED, LOG_DIR, RPC_TIMEOUT, PING_INTERVAL, HB_INTERVAL, HB_TIMEOUT, NET_DROP_PROB,
+NET_DELAY_MS, NET_JITTER_MS, NET_DUP_PROB` (detalhes em `src/config.py`). O `compose.yaml` aceita as mesmas via `.env`/shell.
 `SEED` é a semente do experimento (a registrada no `meta.json`); cada nó usa a sua própria, `SEED * 1000 + NODE_ID`, para que as falhas sorteadas sejam independentes entre nós.
 
 ## Reprodução completa e relatório

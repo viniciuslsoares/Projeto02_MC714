@@ -8,6 +8,8 @@
 # LOG_DIR        pasta dos logs (padrão results/logs)
 # RPC_TIMEOUT    timeout das chamadas de rede, em segundos (padrão 1.0)
 # PING_INTERVAL  intervalo do ping entre nós; 0 desliga (padrão 0)
+# HB_INTERVAL    intervalo do heartbeat do detector de falhas; 0 desliga (padrão 0)
+# HB_TIMEOUT     tempo sem heartbeat para suspeitar de um peer, em segundos (padrão 2.0)
 # NET_DROP_PROB, NET_DELAY_MS, NET_JITTER_MS, NET_DUP_PROB: falhas de rede simuladas
 import os
 from dataclasses import dataclass, field
@@ -31,6 +33,8 @@ class NodeConfig:
     log_dir: str = "results/logs"
     rpc_timeout: float = 1.0
     ping_interval: float = 0.0
+    hb_interval: float = 0.0
+    hb_timeout: float = 2.0
     faults: NetFaults = field(default_factory=NetFaults)
 
 
@@ -67,5 +71,7 @@ def from_env(env=None):
         log_dir=env.get("LOG_DIR", "results/logs"),
         rpc_timeout=float(env.get("RPC_TIMEOUT", "1.0")),
         ping_interval=float(env.get("PING_INTERVAL", "0")),
+        hb_interval=float(env.get("HB_INTERVAL", "0")),
+        hb_timeout=float(env.get("HB_TIMEOUT", "2.0")),
         faults=faults,
     )

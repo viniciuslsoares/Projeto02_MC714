@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import config
 from .config import NetFaults
+from .detector import HeartbeatDetector
 from .eventlog import EventLog, LamportClock
 from .models import Message
 from .network import Network
@@ -33,6 +34,7 @@ class Node:
         self.handlers = {}                 # tipo da mensagem -> função
         self.parar = threading.Event()     # avisa as threads para terminarem
         self.server = None
+        self.detector = None               # detector de falhas (src/detector.py), criado em main()
         self.register("ping", self.on_ping)
 
     def on_ping(self, msg):
@@ -188,6 +190,8 @@ class Node:
                       incarnation=self.log.incarnation)
         if self.cfg.ping_interval > 0:
             self.spawn(self.loop_ping, "ping")
+        if self.detector is not None:
+            self.detector.start()
 
     def loop_ping(self):
         # de tempos em tempos, manda ping para todos os outros nós
@@ -214,7 +218,11 @@ class Node:
 
 
 def main():
-    Node(config.from_env()).run_forever()
+    cfg = config.from_env()
+    node = Node(cfg)
+    if cfg.hb_interval > 0:
+        node.detector = HeartbeatDetector(node, cfg.hb_interval, cfg.hb_timeout)
+    node.run_forever()
 
 
 if __name__ == "__main__":
