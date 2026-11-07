@@ -4,7 +4,7 @@
 # NODE_ID        id do nó (obrigatório)
 # PEERS          outros nós no formato "1=node1:8000,2=node2:8000"
 # PORT           porta HTTP do nó (padrão 8000)
-# SEED           semente do gerador aleatório (padrão 0)
+# SEED           semente do experimento (padrão 0); a do nó é SEED * 1000 + NODE_ID
 # LOG_DIR        pasta dos logs (padrão results/logs)
 # RPC_TIMEOUT    timeout das chamadas de rede, em segundos (padrão 1.0)
 # PING_INTERVAL  intervalo do ping entre nós; 0 desliga (padrão 0)
@@ -63,7 +63,7 @@ def from_env(env=None):
         node_id=node_id,
         peers=parse_peers(env.get("PEERS", ""), node_id),
         port=int(env.get("PORT", "8000")),
-        seed=int(env.get("SEED", "0")),
+        seed=int(env.get("SEED", "0")) * 1000 + node_id,
         log_dir=env.get("LOG_DIR", "results/logs"),
         rpc_timeout=float(env.get("RPC_TIMEOUT", "1.0")),
         ping_interval=float(env.get("PING_INTERVAL", "0")),

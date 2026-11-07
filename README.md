@@ -47,6 +47,7 @@ timeout/erro); perdas/atrasos/duplicações injetados por RNG semeado ⇒ reprod
 ### Variáveis de ambiente
 `NODE_ID, PEERS, PORT, SEED, LOG_DIR, RPC_TIMEOUT, PING_INTERVAL, NET_DROP_PROB, NET_DELAY_MS,
 NET_JITTER_MS, NET_DUP_PROB` (detalhes em `src/config.py`). O `compose.yaml` aceita as mesmas via `.env`/shell.
+`SEED` é a semente do experimento (a registrada no `meta.json`); cada nó usa a sua própria, `SEED * 1000 + NODE_ID`, para que as falhas sorteadas sejam independentes entre nós.
 
 ## Reprodução completa e relatório
 Serão adicionados conforme as issues #5, #6 e #9.
