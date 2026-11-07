@@ -40,9 +40,12 @@ Resultados de cenários com metadados ficam em `results/raw/<cenario>_seed<SEED>
 Algoritmos registram handlers com `node.register("TIPO", fn)` e enviam com `node.net.send(peer, "TIPO", payload, timeout)`.
 
 ### Semântica do canal (base do modelo de sistema)
-HTTP sobre TCP: sem reordenação/corrupção por conexão; envio *best-effort* (devolve `None` em
-timeout/erro); perdas/atrasos/duplicações injetados por RNG semeado ⇒ reprodutíveis;
-`block(peer)` simula partição. Contêineres numa só máquina **não** são domínios de falha independentes.
+Cada mensagem é uma requisição HTTP independente (conexão TCP própria), enviada por várias threads e
+com atraso injetado antes do envio: **não há FIFO** entre mensagens de um nó para o mesmo peer. Envio de
+melhor esforço, sem retransmissão: perda (em cada sentido), partição e nó caído só aparecem como `None`
+em `send()`; com duplicação, a mesma mensagem chega duas vezes. Sorteios por enlace, derivados da semente
+do nó ⇒ reprodutíveis. Contêineres numa só máquina **não** são domínios de falha independentes.
+Detalhes em [`docs/modelo_falhas.md` §6](docs/modelo_falhas.md#6-propriedades-do-canal).
 
 ### Variáveis de ambiente
 `NODE_ID, PEERS, PORT, SEED, LOG_DIR, RPC_TIMEOUT, PING_INTERVAL, NET_DROP_PROB, NET_DELAY_MS,
