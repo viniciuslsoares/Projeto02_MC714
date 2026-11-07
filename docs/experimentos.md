@@ -1,15 +1,16 @@
 # Experimentos
 
-Implementação: `experiments/grid.py` e `experiments/run_all.py` (issue #6). As tabelas e figuras saem dos CSVs na issue #9 (`analysis/analise.py`).
+Implementação: `experiments/grid.py` e `experiments/run_all.py` (issue #6). As tabelas e figuras saem dos CSVs na issue #9 (`analysis/analise.py`). O `run_all` também roda os cenários de falha da issue #7 (`docs/cenarios.md`).
 
 ## 1. Como rodar
 
 ```bash
-python -m experiments.run_all                               # todas as grades, 10 repetições (~23 min)
+python -m experiments.run_all                               # grades (10 repetições, ~23 min) e cenários (5, ~10 min)
 python -m experiments.run_all --grades nos --repeticoes 2   # rodada curta, para conferir
+python -m experiments.run_all --grades nos perda            # só as grades
 ```
 
-- Só usa a biblioteca padrão do Python (≥ 3.12). Não precisa de Docker nem de `pip install`.
+- As grades só usam a biblioteca padrão do Python (≥ 3.12); os cenários também precisam do `pyyaml` (`requirements.txt`). Não precisa de Docker.
 - Saída, versionada no git (os dados brutos):
   - `results/experimentos/<grade>.csv`, com uma linha por ensaio;
   - `results/experimentos/<grade>.csv.meta.json`, com a proveniência (§6).

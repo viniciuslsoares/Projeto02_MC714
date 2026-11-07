@@ -97,5 +97,5 @@ Implementação: `src/bully.py` (issue #4). Testes: `tests/test_bully.py`. Usa o
 
 - **Troca de líder:** quando um nó maior volta, o líder antigo continua se achando líder até o `COORDINATOR` chegar (cerca de uma ida e volta). Não há "no máximo um líder a cada instante".
 - **Subida em tempos diferentes:** no compose, os contêineres sobem com alguma diferença de tempo, e os primeiros podem se declarar líderes até o maior subir. É o mesmo caso da volta de um nó maior.
-- **Partição:** há dois líderes, um por lado, até a cura. Partição assimétrica (um sentido só) pode causar eleições repetidas enquanto durar.
+- **Partição:** há dois líderes, um por lado, até a cura. Partição assimétrica (um sentido só) pode causar eleições repetidas enquanto durar. Medido nos cenários da issue #7 (`docs/cenarios.md`).
 - **Timeouts fixos:** `RPC_TIMEOUT` serve para o OK e `2 × RPC_TIMEOUT` para o `COORDINATOR`; não há ajuste adaptativo.

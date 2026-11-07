@@ -24,10 +24,12 @@
 #   bully.convergencia  (vivacidade) depois que um nó sobe ou cai, ou que uma falha de rede termina,
 #                                    todos os vivos têm o maior vivo como líder em até
 #                                    HB_TIMEOUT + HB_INTERVAL + 2 * RPC_TIMEOUT + folga; só não se cobra
-#                                    se antes disso outro nó sobe ou cai, ou começa uma falha de rede
+#                                    se antes disso outro nó sobe ou cai, ou começa uma falha de rede,
+#                                    nem se a mudança acontece com partição ou perda ativas (issue #7)
 #
 # As propriedades valem no período síncrono. Com partição, perda ou atraso, um [AVISO] pode ser
-# a consequência esperada da falha; o cabeçalho do relatório diz se houve falhas de rede no log.
+# a consequência esperada da falha; o cabeçalho do relatório diz se houve falhas de rede no log
+# e quantos nós se acharam líderes ao mesmo tempo (o Bully não garante um líder só).
 import argparse
 import glob
 import json
@@ -219,6 +221,63 @@ def convergiu(bs, t):
     return all(lider_em(v, t) == maior for v in vivos)
 
 
+def inicio_convergido(bs, c, ponto):
+    # início do último trecho de [c, ponto] em que todos os vivos têm o maior vivo como líder;
+    # None se em `ponto` ainda não convergiu. O estado só muda num "leader" ou quando um nó
+    # sobe ou cai
+    if not convergiu(bs, ponto):
+        return None
+    inicio = None
+    mudancas = sorted(x for v in bs for x in [v.inicio, v.fim] + [t for t, _ in v.lideres] if c < x <= ponto)
+    for x in [c] + mudancas:
+        if not convergiu(bs, x):
+            inicio = None
+        elif inicio is None:
+            inicio = x
+    return inicio
+
+
+def rede_com_falha(vidas, t):
+    # algum nó vivo em t está com partição ou perda ligadas pelo /control: sem resposta, não há
+    # período síncrono. Atraso e duplicação não contam: as chamadas continuam respondidas.
+    # Um nó que volta começa sem falhas: elas ficam só na memória
+    for v in vidas:
+        if not v.inicio <= t < v.fim:
+            continue
+        bloqueados, falhas = set(), False
+        for e in v.eventos:
+            if e["ts"] > t:
+                break
+            d = e["data"]
+            if e["event"] == "partition_start":
+                bloqueados.add(d["peer"])
+            elif e["event"] == "partition_end":
+                bloqueados.discard(d["peer"])
+            elif e["event"] == "faults_updated":
+                falhas = d.get("drop_prob", 0) > 0
+            elif e["event"] == "faults_reset":
+                bloqueados, falhas = set(), False
+        if bloqueados or falhas:
+            return True
+    return False
+
+
+def lideres_ao_mesmo_tempo(vidas, t0, t1):
+    # entre t0 e t1: quantos nós vivos se acharam líderes ao mesmo tempo, no máximo, e por
+    # quanto tempo houve mais de um. Com partição, um por lado (split-brain); sem falhas, só
+    # na troca de líder (docs/modelo_bully.md §5)
+    bs = com_bully(vidas)
+    pontos = sorted({t0, t1} | {x for v in bs for x in [v.inicio, v.fim] + [t for t, _ in v.lideres]
+                                if t0 < x < t1})
+    maximo, duracao = 0, 0.0
+    for a, b in zip(pontos, pontos[1:]):
+        k = sum(1 for v in bs if v.inicio <= a < v.fim and lider_em(v, a) == v.no)
+        maximo = max(maximo, k)
+        if k > 1:
+            duracao += b - a
+    return maximo, duracao
+
+
 def convergencia(vidas, t0, folga):
     bs = com_bully(vidas)
     intervalo = max(d["data"]["intervalo"] for _, d in detectores(vidas))
@@ -236,11 +295,17 @@ def convergencia(vidas, t0, folga):
         if c == anterior:
             continue
         anterior = c
+        if rede_com_falha(vidas, c):
+            # ex.: nó cai durante uma partição; sem período síncrono não há prazo, e o fim
+            # da falha de rede abre outra cobrança
+            nao_conferidas += 1
+            continue
         # confere no prazo, ou um instante antes da próxima perturbação, se ela vier antes
         # (nunca antes de c: processos locais podem subir a menos de EPS um do outro)
         h = min([c + prazo] + [p for p in perturbacoes if p > c])
         ponto = max(c, h - EPS)
-        if not convergiu(bs, ponto):
+        t = inicio_convergido(bs, c, ponto)
+        if t is None:
             if h < c + prazo:
                 nao_conferidas += 1   # perturbado antes do prazo: não dá para cobrar
             else:
@@ -248,17 +313,11 @@ def convergencia(vidas, t0, folga):
                 erros.append(f"não tinha convergido {prazo:.2f} s depois de {motivo} em +{c - t0:.2f}s")
             continue
         total += 1
-        # entre c e h só os "leader" mudam o estado; mede até o início do último trecho convergido
-        t = None
-        for x in [c] + sorted(t for v in bs for t, _ in v.lideres if c < t <= ponto):
-            if not convergiu(bs, x):
-                t = None
-            elif t is None:
-                t = x
         pior = max(pior, t - c)
     return resultado("bully.convergencia", total, erros,
                      f"{total} mudanças conferidas, convergência em até {pior:.2f} s (prazo "
-                     f"{prazo:.2f} s); {nao_conferidas} não conferidas (outra mudança antes do prazo)")
+                     f"{prazo:.2f} s); {nao_conferidas} não conferidas (outra mudança antes do prazo, "
+                     f"ou durante partição ou perda)")
 
 
 def verificar(pasta, folga=FOLGA):
@@ -277,8 +336,12 @@ def verificar(pasta, folga=FOLGA):
         f"Logs: {pasta} ({len({v.no for v in vidas})} nós, {len(vidas)} vidas, "
         f"{sum(len(v.eventos) for v in vidas)} eventos, {max(v.fim for v in vidas) - t0:.1f} s)",
         f"Folga dos prazos: {folga} s. Falhas de rede no log: {rede}",
-        "Tempos em +s contados do primeiro node_start. As propriedades valem no período síncrono.",
     ]
+    if com_bully(vidas):
+        maximo, duracao = lideres_ao_mesmo_tempo(vidas, t0, max(v.fim for v in vidas))
+        cabecalho.append(f"Nós que se acharam líderes ao mesmo tempo: até {maximo} "
+                         f"({duracao:.2f} s com mais de um)")
+    cabecalho.append("Tempos em +s contados do primeiro node_start. As propriedades valem no período síncrono.")
     if detectores(vidas):
         props = [suspeita_apos_timeout(vidas, t0), alternancia(vidas, t0),
                  completude(vidas, t0, folga), restauracao(vidas, t0, folga)]

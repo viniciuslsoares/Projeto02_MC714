@@ -110,29 +110,50 @@ def lider(porta):
         return None
 
 
+def iniciar_no(pasta, i, portas, seed, drop_prob, hb_intervalo, hb_timeout, rpc_timeout):
+    # sobe o nó i num processo próprio, escutando só em 127.0.0.1; portas: id -> porta
+    env = dict(os.environ, NODE_ID=str(i), BIND_ADDR="127.0.0.1", PORT=str(portas[i]),
+               PEERS=",".join(f"{j}=127.0.0.1:{p}" for j, p in portas.items()),
+               SEED=str(seed), LOG_DIR=pasta, PING_INTERVAL="0",
+               RPC_TIMEOUT=str(rpc_timeout), HB_INTERVAL=str(hb_intervalo),
+               HB_TIMEOUT=str(hb_timeout), NET_DROP_PROB=str(drop_prob),
+               NET_DELAY_MS="0", NET_JITTER_MS="0", NET_DUP_PROB="0")
+    # "a": um nó que volta (cenários da #7) continua o mesmo arquivo
+    with open(os.path.join(pasta, f"node{i}.err"), "a") as erros:
+        return subprocess.Popen([sys.executable, "-m", "src.node"], cwd=RAIZ, env=env,
+                                stdout=subprocess.DEVNULL, stderr=erros)
+
+
+def esperar_lider(portas, esperado, limite_s, pasta):
+    fim = time.monotonic() + limite_s
+    while any(lider(p) != esperado for p in portas.values()):
+        if time.monotonic() > fim:
+            raise RuntimeError(f"os nós não elegeram o nó {esperado} em {limite_s} s (ver {pasta})")
+        time.sleep(0.05)
+
+
+def parar(procs):
+    for p in procs.values():
+        if p.poll() is None:
+            p.send_signal(signal.SIGTERM)   # desligamento gracioso (node_stop no log)
+    for p in procs.values():
+        try:
+            p.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            p.kill()
+
+
 def rodar_ensaio(pasta, seed, n, drop_prob, hb_intervalo, hb_timeout, rpc_timeout,
                  aquecimento_s, antes_s, depois_s, limite_s=60.0):
     # devolve os instantes (time.time) de início das medidas, do crash e do fim
     shutil.rmtree(pasta, ignore_errors=True)
     os.makedirs(pasta)
     portas = dict(zip(range(1, n + 1), portas_livres(n)))
-    peers = ",".join(f"{i}=127.0.0.1:{p}" for i, p in portas.items())
     procs = {}
     try:
-        for i, porta in portas.items():
-            env = dict(os.environ, NODE_ID=str(i), PEERS=peers, BIND_ADDR="127.0.0.1",
-                       PORT=str(porta), SEED=str(seed), LOG_DIR=pasta, PING_INTERVAL="0",
-                       RPC_TIMEOUT=str(rpc_timeout), HB_INTERVAL=str(hb_intervalo),
-                       HB_TIMEOUT=str(hb_timeout), NET_DROP_PROB=str(drop_prob),
-                       NET_DELAY_MS="0", NET_JITTER_MS="0", NET_DUP_PROB="0")
-            with open(os.path.join(pasta, f"node{i}.err"), "w") as erros:
-                procs[i] = subprocess.Popen([sys.executable, "-m", "src.node"], cwd=RAIZ, env=env,
-                                            stdout=subprocess.DEVNULL, stderr=erros)
-        fim = time.monotonic() + limite_s
-        while any(lider(p) != n for p in portas.values()):
-            if time.monotonic() > fim:
-                raise RuntimeError(f"os nós não elegeram o nó {n} em {limite_s} s (ver {pasta})")
-            time.sleep(0.05)
+        for i in portas:
+            procs[i] = iniciar_no(pasta, i, portas, seed, drop_prob, hb_intervalo, hb_timeout, rpc_timeout)
+        esperar_lider(portas, n, limite_s, pasta)
         time.sleep(aquecimento_s)
         t_ini = time.time()
         time.sleep(antes_s)
@@ -142,14 +163,7 @@ def rodar_ensaio(pasta, seed, n, drop_prob, hb_intervalo, hb_timeout, rpc_timeou
         time.sleep(depois_s)
         t_fim = time.time()
     finally:
-        for p in procs.values():
-            if p.poll() is None:
-                p.send_signal(signal.SIGTERM)   # desligamento gracioso (node_stop no log)
-        for p in procs.values():
-            try:
-                p.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                p.kill()
+        parar(procs)
     return t_ini, t_crash, t_fim
 
 
@@ -284,17 +298,17 @@ def execute_grid(cfg, saida="results/experimentos", logs="results/raw/experiment
     return GridResults(cfg, linhas, caminho, caminho + ".meta.json")
 
 
-def gravar(cfg, linhas, caminho, inicio, comando):
+def escrever_csv(caminho, colunas, linhas):
     texto = io.StringIO()
-    escritor = csv.DictWriter(texto, fieldnames=list(COLUNAS), lineterminator="\n")
+    escritor = csv.DictWriter(texto, fieldnames=list(colunas), lineterminator="\n")
     escritor.writeheader()
     escritor.writerows(linhas)
     escrever_atomico(caminho, texto.getvalue())
 
+
+def proveniencia(inicio, comando):
     fim = datetime.now(timezone.utc)
-    meta = {
-        "grade": cfg.nome,
-        "completa": len(linhas) == cfg.repeticoes * len(cfg.niveis),
+    return {
         "comando": comando or " ".join(["python -m experiments.run_all"] + sys.argv[1:]),
         "git_commit": git("rev-parse", "HEAD"),
         # results/ fica de fora: os próprios CSVs mudam a cada execução
@@ -302,6 +316,15 @@ def gravar(cfg, linhas, caminho, inicio, comando):
         "inicio_utc": inicio.isoformat(timespec="seconds"),
         "fim_utc": fim.isoformat(timespec="seconds"),
         "duracao_total_s": round((fim - inicio).total_seconds(), 1),
+    }
+
+
+def gravar(cfg, linhas, caminho, inicio, comando):
+    escrever_csv(caminho, COLUNAS, linhas)
+    meta = {
+        "grade": cfg.nome,
+        "completa": len(linhas) == cfg.repeticoes * len(cfg.niveis),
+        **proveniencia(inicio, comando),
         "config": asdict(cfg),
         "parametros_padrao": PADRAO,
         "ensaio": {"aquecimento_s": cfg.aquecimento_s, "antes_do_crash_s": cfg.antes_s,

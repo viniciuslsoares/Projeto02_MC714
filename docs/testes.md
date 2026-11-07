@@ -10,6 +10,7 @@ Implementação: `tests/` e `analysis/log_verifier.py` (issue #5). As propriedad
   - `test_detector::test_suspeita_e_restauracao` e os unitários de `test_bully` (handlers e decisão de eleição com estado escolhido à mão).
   - `test_log_verifier::test_violacao_deliberada_e_detectada` (verificador com logs sintéticos).
   - `test_experimentos::test_medir_com_log_sintetico` (métricas dos experimentos com um log sintético).
+  - `test_cenarios::test_cenarios_do_repositorio_sao_validos` (os YAML de `scenarios/`).
 - **Integração:** vários nós reais trocando mensagens HTTP.
   - No pytest (local e CI), com os nós em threads e portas livres em 127.0.0.1:
     - `test_sanity`;
@@ -18,16 +19,19 @@ Implementação: `tests/` e `analysis/log_verifier.py` (issue #5). As propriedad
     - `test_detector::test_rede_estavel_sem_falso_positivo`;
     - `test_bully::test_cenario_normal_lider_e_o_maior_id`.
     - `test_experimentos::test_grade_com_processos_reais` (uma grade pequena, com um processo por nó, grava o CSV e o `.meta.json`).
+    - `test_cenarios::test_cenario_com_processos_reais` (um cenário pequeno com partição, cura, crash e retorno, pelo injetor da #2, com um processo por nó).
   - No compose (Docker, rodado à mão): `./scripts/env.sh smoke`; ou `./scripts/env.sh up` e, depois, `python -m analysis.log_verifier` sobre `results/logs`.
 - **Falhas:** crash, perda, atraso, duplicação e partição injetados.
   - No pytest:
     - `test_detector::test_crash_detectado_por_todos_e_recuperacao`;
     - `test_bully::test_lider_cai_novo_lider_e_anunciado_e_maior_id_volta`;
     - `test_log_verifier::test_execucao_real_com_crash_e_retorno_sem_avisos`;
+    - `test_log_verifier::test_falhas_combinadas_split_brain_e_convergencia_depois_da_cura` (log sintético: partição, queda durante a partição e cura);
     - `test_perda`;
     - `test_faults` (injetor);
     - `test_infra` (perda, atraso, duplicação, partição).
   - No compose: `./scripts/run_scenario.sh scenarios/<cenário>.yaml` roda o cenário, coleta os logs em `results/raw/<cenário>_seed<SEED>/` e roda o verificador sobre eles (`verifications.txt` na mesma pasta).
+  - Com processos locais: `python -m experiments.cenarios` roda todos os cenários com repetições e grava o resultado do verificador de cada execução no CSV (`docs/cenarios.md`).
 
 ## 2. Cenário normal e de falha de cada algoritmo
 
@@ -45,7 +49,7 @@ Implementação: `tests/` e `analysis/log_verifier.py` (issue #5). As propriedad
   python -m analysis.log_verifier results/raw/particao_rede_seed1001 --saida /tmp/v.txt
   ```
 - O verificador lê todos os `node*.jsonl` da pasta e escreve:
-  - um cabeçalho com nós, vidas, eventos, duração e falhas de rede encontradas no log;
+  - um cabeçalho com nós, vidas, eventos, duração, falhas de rede encontradas no log e quantos nós se acharam líderes ao mesmo tempo (a medida do split-brain, issue #7; não é uma propriedade, `docs/cenarios.md` §7);
   - uma linha `[OK]` ou `[AVISO]` por propriedade. O `[AVISO]` mostra até 3 exemplos, com tempos contados do primeiro `node_start`.
 - **Vidas:** cada arquivo é dividido em encarnações do nó, de um `node_start` até o `node_stop`. Quando não há `node_stop` (SIGKILL), a vida vai até o último evento registrado. O nó está vivo dentro de uma das suas vidas.
 - Propriedades:
@@ -57,7 +61,7 @@ Implementação: `tests/` e `analysis/log_verifier.py` (issue #5). As propriedad
 | `detector.completude` | vivacidade | Todo silêncio de um peer maior que `timeout + intervalo + folga` tem um `suspect` dentro desse prazo depois do último heartbeat. Cobre crash e partição. |
 | `detector.restauracao` | vivacidade (precisão eventual) | Depois de um `suspect`, o `restore` vem em até `intervalo + folga` depois do primeiro heartbeat seguinte. |
 | `bully.acordo` | segurança | Todo `leader` decide um líder L maior ou igual a todo nó que ficou vivo durante toda a eleição de L, do último `election_start` de L até a decisão. Um nó que sobe ou cai no meio da eleição fica de fora, como no modelo. |
-| `bully.convergencia` | vivacidade | Depois que um nó sobe ou cai (início ou fim de uma vida), ou que uma falha de rede termina (`partition_end`, `faults_reset`), todos os vivos têm o maior vivo como líder ao fim do prazo `HB_TIMEOUT + HB_INTERVAL + 2 × RPC_TIMEOUT + folga`. Se antes do prazo outro nó sobe ou cai, ou uma falha de rede começa (`partition_start`, `faults_updated`), a cobrança é conferida um instante antes disso e só é descartada se ainda não tinha convergido (contada como "não conferida"). Durante uma falha de rede não há cobrança. O `[OK]` mostra o maior tempo até convergir. |
+| `bully.convergencia` | vivacidade | Depois que um nó sobe ou cai (início ou fim de uma vida), ou que uma falha de rede termina (`partition_end`, `faults_reset`), todos os vivos têm o maior vivo como líder ao fim do prazo `HB_TIMEOUT + HB_INTERVAL + 2 × RPC_TIMEOUT + folga`. Se antes do prazo outro nó sobe ou cai, ou uma falha de rede começa (`partition_start`, `faults_updated`), a cobrança é conferida um instante antes disso e só é descartada se ainda não tinha convergido (contada como "não conferida"). Durante uma partição ou perda ligadas pelo `/control` não há cobrança: um nó que sobe ou cai nesse período não abre cobrança, e a cura abre outra (issue #7). Atraso e duplicação continuam cobrados. O `[OK]` mostra o maior tempo até convergir. |
 
 - Os parâmetros vêm do próprio log: `intervalo`, `timeout` e `peers` vêm do `detector_start`, e o `RPC_TIMEOUT` vem do `bully_start`.
 - Tolerâncias:
@@ -71,6 +75,7 @@ Implementação: `tests/` e `analysis/log_verifier.py` (issue #5). As propriedad
     - O mesmo com 20% de perda: `[AVISO] bully.convergencia` (o líder só ficou certo em todos 5,36 s depois do crash, com prazo de 5,10 s); as outras 5 deram `[OK]`.
     - `particao_rede.yaml` com 3 nós: `[AVISO] bully.acordo` (os nós 1 e 2 elegem o 2 com o 3 vivo do outro lado); as outras 5 deram `[OK]`, com no máximo 0,17 s para convergir depois de cada mudança.
   - O cenário `particao_rede.yaml` dura 15 s para que, depois da cura (8 s), sobre mais que o prazo da convergência (5 s com os padrões). Um cenário mais curto que isso deixa a cobrança da cura "não conferida".
+  - Nos cenários da issue #7, o que se mantém e o que é violado em cada um, e por quê, está em `docs/cenarios.md` §6.
 - **Teste do verificador:** `test_violacao_deliberada_e_detectada` parte de um log sintético correto e quebra uma propriedade por vez. O verificador precisa acusar exatamente as propriedades quebradas:
 
 | Violação deliberada | Propriedade acusada |
@@ -93,9 +98,11 @@ Implementação: `tests/` e `analysis/log_verifier.py` (issue #5). As propriedad
     - logs sem `peers` no `detector_start` (gerados antes desta issue).
   - `test_execucao_real_com_crash_e_retorno_sem_avisos`, com nós reais.
 
+  Falhas combinadas: `test_falhas_combinadas_split_brain_e_convergencia_depois_da_cura` monta um log em que o nó 3 fica isolado, 1 e 2 elegem o 2, o nó 1 cai durante a partição e a cura junta 2 e 3. O verificador precisa acusar só `bully.acordo` (split-brain). A queda durante a partição não abre cobrança de convergência; a cura abre uma, que é cumprida. A medida de líderes ao mesmo tempo dá 2 nós por 2,5 s.
+
 ## 4. Como rodar
 
-- `python -m pytest`: todas as camadas que não precisam de Docker (cerca de 40 s).
+- `python -m pytest`: todas as camadas que não precisam de Docker (cerca de 1 min).
 - CI: `.github/workflows/ci.yml` roda o pytest com Python 3.12 a cada push e pull request. O CI não roda Docker; a camada do compose é rodada à mão.
 
 ## 5. Limitações

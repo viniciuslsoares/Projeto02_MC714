@@ -1,0 +1,27 @@
+# Cenário de recuperação com falhas em cascata (issue #7)
+# O líder (nó 3) cai aos 3 s e, antes de os outros perceberem, o nó 2 (o próximo líder) cai
+# aos 4 s: sobra o nó 1, que se elege. O antigo líder volta aos 10 s e retoma a liderança;
+# o nó 2 volta aos 16 s e só reconhece o líder 3 (volta de um nó que não é o maior).
+# Depois da segunda queda e de cada volta sobra mais que o prazo de convergência do Bully (5 s
+# com os padrões), para medir a reconvergência (docs/cenarios.md).
+name: "cascata_e_recuperacao"
+description: "Líder e próximo líder caem em sequência e depois voltam, um de cada vez"
+duration_s: 22.0
+seed: 1003
+
+events:
+  - time_s: 3.0
+    action: "crash"
+    node: 3
+
+  - time_s: 4.0
+    action: "crash"
+    node: 2
+
+  - time_s: 10.0
+    action: "recover"
+    node: 3
+
+  - time_s: 16.0
+    action: "recover"
+    node: 2

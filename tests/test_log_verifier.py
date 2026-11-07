@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from analysis.log_verifier import main, verificar
+from analysis.log_verifier import ler_vidas, lideres_ao_mesmo_tempo, main, verificar
 from src import config as cfg
 from src.bully import Bully
 from src.detector import HeartbeatDetector
@@ -135,6 +135,30 @@ def violacao_converge_e_diverge(logs):
     logs[2].append(ev(2, 1.0, "leader", lider=2))
 
 
+def particao_queda_e_cura(logs):
+    # falhas combinadas (issue #7): o nó 3 fica isolado de 1 e 2 em 1,0 s, e 1 e 2 elegem o 2
+    # em 1,7 s (dois líderes: 2 e 3). O nó 1 cai em 2,0 s, durante a partição. A cura em 4,0 s
+    # junta 2 e 3, e o 2 aceita o 3 em 4,2 s
+    for i, peers in ((1, [3]), (2, [3]), (3, [1, 2])):
+        logs[i] += [ev(i, 1.0, "partition_start", peer=p) for p in peers]
+        for p in peers:
+            sem_heartbeat(logs, i, p, 1.0, 4.0)
+            logs[i].append(ev(i, 1.6, "suspect", peer=p))
+    logs[2].append(ev(2, 1.65, "election_start", motivo="lider_suspeito", maiores=[3]))
+    logs[1].append(ev(1, 1.7, "leader", lider=2))
+    logs[2].append(ev(2, 1.7, "leader", lider=2))
+    logs[1] = [e for e in logs[1] if e["ts"] <= 2.0]                 # SIGKILL do nó 1
+    for i in (2, 3):
+        sem_heartbeat(logs, i, 1, 2.0, 99)
+    logs[2].append(ev(2, 2.6, "suspect", peer=1))                     # o 3 já suspeitava do 1
+    for i, peers in ((2, [3]), (3, [1, 2])):
+        logs[i] += [ev(i, 4.0, "partition_end", peer=p) for p in peers]
+    logs[2] += [ev(2, 4.15, "restore", peer=3),
+                ev(2, 4.15, "election_start", motivo="no_maior_vivo", maiores=[3]),
+                ev(2, 4.2, "leader", lider=3)]
+    logs[3].append(ev(3, 4.15, "restore", peer=2))
+
+
 def gravar(pasta, logs):
     for i, eventos in logs.items():
         with open(pasta / f"node{i}.jsonl", "w", encoding="utf-8") as f:
@@ -178,6 +202,18 @@ def test_execucao_correta_sem_avisos(tmp_path, cenario):
     logs = sem_falhas()
     cenario(logs)
     assert avisos(tmp_path, logs) == set()
+
+
+def test_falhas_combinadas_split_brain_e_convergencia_depois_da_cura(tmp_path):
+    logs = sem_falhas(fim=6.0)
+    particao_queda_e_cura(logs)
+    # o acordo é violado (cada lado tem o seu líder); a queda do 1 durante a partição não abre
+    # cobrança de convergência, e a cura abre uma, que é cumprida
+    assert avisos(tmp_path, logs) == {"bully.acordo"}
+    _, props = verificar(str(tmp_path))
+    texto = dict((n, t) for _, n, t in props)["bully.convergencia"]
+    assert "3 mudanças conferidas" in texto and "1 não conferidas" in texto   # a queda do 1
+    assert lideres_ao_mesmo_tempo(ler_vidas(str(tmp_path)), 0.0, 6.0) == (2, pytest.approx(2.5))
 
 
 def test_relatorio(tmp_path):

@@ -1,0 +1,43 @@
+# Cenário de falhas combinadas (issue #7): partição + perda + queda de líder durante a partição
+# Aos 3 s o líder (nó 3) fica isolado dos nós 1 e 2, que elegem o nó 2 (dois líderes: 2 e 3).
+# Aos 8 s, ainda com a partição, todos passam a perder 20% das mensagens; aos 10 s o nó 2, líder
+# do lado 1-2, cai: o nó 1 fica sozinho do seu lado e se elege (dois líderes: 1 e 3). Aos 16 s o
+# reset_faults em todos cura a partição e acaba com a perda (o comando para o nó 2, caído, falha
+# e o injetor avisa). O nó 2 volta aos 21 s. Depois da cura e da volta sobra mais que o prazo de
+# convergência do Bully (5 s com os padrões).
+name: "particao_queda_e_perda"
+description: "Partição do líder, perda de 20% e queda do líder do outro lado durante a partição"
+duration_s: 27.0
+seed: 1005
+
+events:
+  - time_s: 3.0
+    action: "partition"
+    nodes: [1, 2]
+    target: 3
+
+  - time_s: 8.0
+    action: "set_faults"
+    node: 1
+    drop_prob: 0.2
+
+  - time_s: 8.0
+    action: "set_faults"
+    node: 2
+    drop_prob: 0.2
+
+  - time_s: 8.0
+    action: "set_faults"
+    node: 3
+    drop_prob: 0.2
+
+  - time_s: 10.0
+    action: "crash"
+    node: 2
+
+  - time_s: 16.0
+    action: "reset_faults"
+
+  - time_s: 21.0
+    action: "recover"
+    node: 2
