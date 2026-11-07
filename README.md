@@ -2,8 +2,7 @@
 
 Nós lógicos em Python (HTTP/JSON, usando só a biblioteca padrão) orquestrados por Docker Compose v2.
 Algoritmos planejados: eleição **Bully** + detector de falhas por **heartbeat**, com extras de
-falhas combinadas/partições e integração em um serviço prático. Planejamento em `docs/issues/`;
-decisões e iterações em [`HISTORICO.md`](HISTORICO.md).
+falhas combinadas/partições e integração em um serviço prático. Planejamento em `docs/issues/`.
 
 ## Requisitos
 Docker + Docker Compose v2, Python ≥ 3.12 (testes), bash (WSL/Git Bash no Windows).
@@ -28,8 +27,8 @@ Resultados de cenários com metadados ficam em `results/raw/<cenario>_seed<SEED>
 | Arquivo | Papel |
 |---|---|
 | `src/config.py` | Configuração via variáveis de ambiente (id, peers, porta, seed, timeouts, falhas de rede) |
-| `src/models.py` | `Message` e `LogEvent` |
-| `src/eventlog.py` | Relógio de Lamport + log JSONL thread-safe; após reinício o relógio é retomado do maior `clock` do log (nunca volta) |
+| `src/models.py` | `Message` (mensagem trocada entre os nós) |
+| `src/eventlog.py` | Relógio de Lamport + log JSONL thread-safe; após reinício o relógio é retomado do maior `clock` do log (não volta a zero) |
 | `src/network.py` | Transporte HTTP/JSON com **timeout obrigatório**; perda, atraso, duplicação e partição injetáveis (RNG semeado) |
 | `src/node.py` | Nó genérico: servidor HTTP, rotas `/msg`, `/control` (falhas dinâmicas), persistência de estado e healthcheck |
 | `experiments/fault_injector.py` | Injetor programático que lê cenários em YAML e comanda partições, atrasos e crashes |
@@ -44,8 +43,8 @@ Cada mensagem é uma requisição HTTP independente (conexão TCP própria), env
 com atraso injetado antes do envio: **não há FIFO** entre mensagens de um nó para o mesmo peer. Envio de
 melhor esforço, sem retransmissão: perda (em cada sentido), partição e nó caído só aparecem como `None`
 em `send()`; com duplicação, a mesma mensagem chega duas vezes. Sorteios por enlace, derivados da semente
-do nó ⇒ reprodutíveis. Contêineres numa só máquina **não** são domínios de falha independentes.
-Detalhes em [`docs/modelo_falhas.md` §6](docs/modelo_falhas.md#6-propriedades-do-canal).
+do nó ⇒ reprodutíveis (com limites). Contêineres numa só máquina **não** são domínios de falha independentes.
+Detalhes em [`docs/modelo_falhas.md`](docs/modelo_falhas.md) §6 (canal) e §7 (limitações conhecidas).
 
 ### Variáveis de ambiente
 `NODE_ID, PEERS, PORT, SEED, LOG_DIR, RPC_TIMEOUT, PING_INTERVAL, NET_DROP_PROB, NET_DELAY_MS,
