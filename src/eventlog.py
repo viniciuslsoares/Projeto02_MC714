@@ -55,6 +55,8 @@ class EventLog:
         }
         texto = json.dumps(linha, sort_keys=True)
         with self.lock:
+            if self.arquivo.closed:
+                return   # nó já parou; uma thread de fundo ainda terminava um envio
             self.arquivo.write(texto + "\n")
             self.arquivo.flush()
             if self.echo:
