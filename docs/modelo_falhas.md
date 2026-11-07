@@ -90,3 +90,15 @@ Para executar um cenário com o cluster Docker ativo e gravar os resultados com 
 ```
 
 Os logs gerados de cada nó e o arquivo `meta.json` com os metadados de proveniência (commit Git, semente e timestamp) são armazenados em `results/raw/<cenario>_seed<SEED>/`.
+
+---
+
+## 6. Propriedades do canal
+
+O transporte é HTTP/JSON sobre TCP (`src/network.py`, com `urllib`): cada `send()` faz uma requisição HTTP independente ao `/msg` do peer e espera a resposta até o timeout. Os sorteios de perda, atraso e duplicação usam um gerador pseudoaleatório por enlace, derivado da semente do nó; com a mesma semente, cada enlace repete a mesma sequência de falhas.
+
+- **Ordenação:** não há FIFO entre mensagens distintas, nem do mesmo emissor para o mesmo peer. Cada mensagem usa uma conexão TCP própria e sai de uma entre várias threads (loop de ping, threads do servidor HTTP, threads dos algoritmos) depois de um atraso sorteado; o receptor atende cada requisição numa thread própria (`ThreadingHTTPServer`). Dentro de uma requisição o TCP entrega os bytes íntegros e em ordem, mas os algoritmos não podem assumir FIFO: se precisarem, numeram as mensagens e reordenam no receptor.
+- **Perdas:** a perda simulada vale em cada sentido (requisição e resposta), com a mesma `drop_prob`; a partição descarta a mensagem no emissor. Nos dois casos o emissor só percebe quando o timeout expira (`send()` devolve `None` após `timeout`); se a perda foi da resposta, o receptor já processou a mensagem. O emissor não distingue perda da requisição, perda da resposta, partição ou nó caído: tudo vira timeout (ou erro de conexão imediato, quando o contêiner do peer não existe).
+- **Duplicação:** com `dup_prob`, a mesma mensagem (mesmo timestamp de Lamport) é entregue duas vezes ao receptor. Uma retransmissão do algoritmo após timeout tem efeito parecido, porque resposta perdida não implica requisição perdida. Por isso os handlers precisam ser idempotentes.
+- **Garantia de entrega:** nenhuma. O envio é de melhor esforço, com no máximo uma entrega por tentativa (duas com duplicação) e sem retransmissão automática; quem chama `send()` decide se tenta de novo. No sentido da Aula 14, a comunicação é **transiente** (a mensagem só existe enquanto emissor e receptor executam, sem a persistência de um middleware orientado a mensagens da Aula 15) e **síncrona bloqueante** (`send()` bloqueia até o receptor processar e responder, ou até o timeout).
+- **Integridade:** supomos que não há corrupção nem mensagens forjadas (não consideramos falhas bizantinas). O TCP detecta corrupção de bytes, e só os nós e o injetor de falhas acessam `/msg` e `/control`; o campo `sender` é aceito sem autenticação.
