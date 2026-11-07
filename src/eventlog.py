@@ -33,7 +33,17 @@ class EventLog:
         self.lock = threading.Lock()
         os.makedirs(log_dir, exist_ok=True)
         self.path = os.path.join(log_dir, "node" + str(node_id) + ".jsonl")
+        # Crash-recovery: o log de antes do reinício continua no disco. O relógio
+        # retoma do maior valor já escrito, para nunca andar para trás (Aula 17),
+        # e cada node_start anterior conta como uma "encarnação" do nó.
+        maior, inicios, termina_no_meio = ler_log_anterior(self.path)
+        clock.valor = max(clock.valor, maior)
+        self.incarnation = inicios + 1
         self.arquivo = open(self.path, "a", encoding="utf-8")
+        if termina_no_meio:
+            # a última linha foi cortada (ex.: SIGKILL no meio da escrita);
+            # quebra a linha para o próximo evento não ser grudado nela
+            self.arquivo.write("\n")
 
     def emit(self, event, **data):
         linha = {
@@ -53,6 +63,28 @@ class EventLog:
     def close(self):
         with self.lock:
             self.arquivo.close()
+
+
+def ler_log_anterior(path):
+    # Lê o log deixado por uma execução anterior do mesmo nó (se existir).
+    # Devolve (maior clock, quantos node_start, se o arquivo termina sem "\n").
+    # Linhas malformadas são ignoradas.
+    maior = 0
+    inicios = 0
+    termina_no_meio = False
+    if not os.path.exists(path):
+        return maior, inicios, termina_no_meio
+    with open(path, encoding="utf-8") as f:
+        for linha in f:
+            termina_no_meio = not linha.endswith("\n")
+            try:
+                evento = json.loads(linha)
+            except ValueError:
+                continue   # linha vazia ou truncada
+            maior = max(maior, evento.get("clock", 0))
+            if evento.get("event") == "node_start":
+                inicios += 1
+    return maior, inicios, termina_no_meio
 
 
 def read_events(path):
