@@ -143,8 +143,9 @@ class Bully:
         return {"aceito": True}
 
     def pedir_eleicao(self, motivo):
-        # chamada com o lock. Se já há uma eleição em andamento aqui, ela termina
-        # com um COORDINATOR para todos, que também responde a quem pediu
+        # chamada com o lock. Se já há uma eleição em andamento aqui, não abre outra:
+        # ela termina com um COORDINATOR para todos. Se quem pediu não o receber,
+        # repete a própria eleição depois de `espera` (motivo "sem_coordinator")
         if not self.em_eleicao:
             self.pedido = motivo
         self.acordar.set()

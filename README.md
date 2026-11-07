@@ -49,10 +49,10 @@ do nó ⇒ reprodutíveis (com limites). Contêineres numa só máquina **não**
 Detalhes em [`docs/modelo_falhas.md`](docs/modelo_falhas.md) §6 (canal) e §7 (limitações conhecidas).
 
 ### Variáveis de ambiente
-`NODE_ID, PEERS, HOST, PORT, SEED, LOG_DIR, RPC_TIMEOUT, PING_INTERVAL, HB_INTERVAL, HB_TIMEOUT, NET_DROP_PROB,
+`NODE_ID, PEERS, BIND_ADDR, PORT, SEED, LOG_DIR, RPC_TIMEOUT, PING_INTERVAL, HB_INTERVAL, HB_TIMEOUT, NET_DROP_PROB,
 NET_DELAY_MS, NET_JITTER_MS, NET_DUP_PROB` (detalhes em `src/config.py`). O `compose.yaml` aceita as mesmas via `.env`/shell.
 `HB_INTERVAL > 0` liga o detector e o Bully (o compose usa 0,5 s); o Bully usa `RPC_TIMEOUT` como timeout do OK.
-`HOST` é `127.0.0.1` por padrão; no compose é `0.0.0.0` dentro da rede interna, e as portas são publicadas só em `127.0.0.1` (o `/control` não tem autenticação).
+`BIND_ADDR` é `127.0.0.1` por padrão; no compose é `0.0.0.0` dentro da rede interna, e as portas são publicadas só em `127.0.0.1` (o `/control` não tem autenticação).
 `SEED` é a semente do experimento (a registrada no `meta.json`); cada nó usa a sua própria, `SEED * 1000 + NODE_ID`, para que as falhas sorteadas sejam independentes entre nós.
 
 ## Reprodução completa e relatório

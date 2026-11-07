@@ -177,9 +177,9 @@ class Node:
                     self.responder(404, {"error": "not_found"})
 
         ThreadingHTTPServer.daemon_threads = True
-        # HOST: 127.0.0.1 por padrão (o /control não tem autenticação); no contêiner o
+        # BIND_ADDR: 127.0.0.1 por padrão (o /control não tem autenticação); no contêiner o
         # compose usa 0.0.0.0 para a rede interna e publica as portas só em 127.0.0.1
-        return ThreadingHTTPServer((self.cfg.host, self.cfg.port), Handler)
+        return ThreadingHTTPServer((self.cfg.bind_addr, self.cfg.port), Handler)
 
     @property
     def port(self):

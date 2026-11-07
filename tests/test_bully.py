@@ -15,6 +15,7 @@ INTERVALO = 0.1      # heartbeat do detector
 TIMEOUT_HB = 0.5     # detector suspeita depois disso sem heartbeat
 TIMEOUT = 0.3        # Bully: espera pelo OK (e 2 * TIMEOUT pelo COORDINATOR)
 LIMITE = TIMEOUT_HB + INTERVALO + 2 * TIMEOUT + 0.5   # pior caso no modelo + folga
+QUIETO = 2 * TIMEOUT + 5 * INTERVALO                  # espera as eleições pendentes terminarem
 
 
 def liga_bully(nodes):
@@ -54,8 +55,8 @@ def no_isolado(tmp_path):
 # --- unitários (sem threads de fundo) ---
 
 def test_host_padrao_e_loopback():
-    assert cfg.from_env({"NODE_ID": "1"}).host == "127.0.0.1"
-    assert cfg.from_env({"NODE_ID": "1", "HOST": "0.0.0.0"}).host == "0.0.0.0"
+    assert cfg.from_env({"NODE_ID": "1"}).bind_addr == "127.0.0.1"
+    assert cfg.from_env({"NODE_ID": "1", "BIND_ADDR": "0.0.0.0"}).bind_addr == "0.0.0.0"
 
 
 def test_parametros_invalidos(tmp_path):
@@ -112,12 +113,14 @@ def test_cenario_normal_lider_e_o_maior_id(tmp_path):
     nodes = make_cluster(tmp_path, n=4)
     liga_bully(nodes)
     ok = espera(lambda: lideres(nodes) == {1: 4, 2: 4, 3: 4, 4: 4})
-    time.sleep(5 * INTERVALO)
+    time.sleep(QUIETO)
     final = lideres(nodes)
     for n in nodes:
         n.stop()
     assert ok and final == {1: 4, 2: 4, 3: 4, 4: 4}
-    assert len(eventos(nodes, "election_start")) > 1                 # houve eleições concorrentes
+    # eleições concorrentes: pelo menos dois nós começaram a eleger antes do primeiro líder
+    primeiro_lider = min(e["ts"] for e in eventos(nodes, "leader"))
+    assert len({e["node"] for e in eventos(nodes, "election_start") if e["ts"] < primeiro_lider}) >= 2
     assert {e["data"]["lider"] for e in eventos(nodes, "leader")} == {4}   # ninguém decidiu outro
 
 
@@ -125,7 +128,7 @@ def test_lider_cai_novo_lider_e_anunciado_e_maior_id_volta(tmp_path):
     nodes = make_cluster(tmp_path, n=4)
     liga_bully(nodes)
     assert espera(lambda: lideres(nodes) == {1: 4, 2: 4, 3: 4, 4: 4})
-    time.sleep(5 * INTERVALO)
+    time.sleep(QUIETO)
 
     # crash do líder (nó 4): o nó 3 é eleito e anunciado aos nós 1 e 2
     porta = nodes[3].port
@@ -143,7 +146,7 @@ def test_lider_cai_novo_lider_e_anunciado_e_maior_id_volta(tmp_path):
     liga_bully([novo])
     todos = vivos + [novo]
     assert espera(lambda: lideres(todos) == {1: 4, 2: 4, 3: 4, 4: 4})
-    time.sleep(5 * INTERVALO)
+    time.sleep(QUIETO)
     final = lideres(todos)
     for n in todos:
         n.stop()

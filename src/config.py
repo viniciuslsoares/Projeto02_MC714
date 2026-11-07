@@ -3,7 +3,7 @@
 #
 # NODE_ID        id do nó (obrigatório)
 # PEERS          outros nós no formato "1=node1:8000,2=node2:8000"
-# HOST           endereço em que o servidor HTTP escuta (padrão 127.0.0.1; o compose usa 0.0.0.0)
+# BIND_ADDR      endereço em que o servidor HTTP escuta (padrão 127.0.0.1; o compose usa 0.0.0.0)
 # PORT           porta HTTP do nó (padrão 8000)
 # SEED           semente do experimento (padrão 0); a do nó é SEED * 1000 + NODE_ID
 # LOG_DIR        pasta dos logs (padrão results/logs)
@@ -31,7 +31,7 @@ class NodeConfig:
     node_id: int
     peers: dict                 # id -> "host:porta"
     port: int = 8000
-    host: str = "127.0.0.1"
+    bind_addr: str = "127.0.0.1"
     seed: int = 0
     log_dir: str = "results/logs"
     rpc_timeout: float = 1.0
@@ -70,7 +70,7 @@ def from_env(env=None):
         node_id=node_id,
         peers=parse_peers(env.get("PEERS", ""), node_id),
         port=int(env.get("PORT", "8000")),
-        host=env.get("HOST", "127.0.0.1"),
+        bind_addr=env.get("BIND_ADDR", "127.0.0.1"),
         seed=int(env.get("SEED", "0")) * 1000 + node_id,
         log_dir=env.get("LOG_DIR", "results/logs"),
         rpc_timeout=float(env.get("RPC_TIMEOUT", "1.0")),

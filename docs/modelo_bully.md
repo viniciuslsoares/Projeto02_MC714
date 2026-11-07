@@ -23,10 +23,12 @@ Implementação: `src/bully.py` (issue #4). Testes: `tests/test_bully.py`. Usa o
   - chegou `ELECTION` ou `COORDINATOR` de um nó menor.
 - Eleições concorrentes:
   - Cada nó faz no máximo uma eleição por vez.
-  - Um `ELECTION` recebido durante a eleição não abre outra, porque ela termina com um `COORDINATOR` para todos.
+  - Um `ELECTION` recebido durante a eleição não abre outra: ela termina com um `COORDINATOR` para todos. Se quem pediu não recebe esse `COORDINATOR` (por exemplo, porque já o tinha recebido antes de começar a própria eleição), repete a eleição depois de `2 × RPC_TIMEOUT` (`sem_coordinator`). Isso custa tempo e mensagens, mas não muda o líder.
   - Se um nó maior se anuncia enquanto o nó espera os OKs, o nó não se declara líder.
 - Contador de mensagens:
-  - `election_end` traz em `msgs` quantas `ELECTION`, `OK` e `COORDINATOR` o nó enviou naquela eleição. Contam as tentativas, inclusive para nós caídos.
+  - `election_end` traz em `msgs` quantas `ELECTION`, `OK` e `COORDINATOR` o nó enviou naquela eleição.
+  - `ELECTION` e `COORDINATOR` contam as chamadas a `send()`, inclusive para nós caídos e as perdidas. `OK` conta os `ELECTION` atendidos.
+  - Com duplicação (`NET_DUP_PROB`), uma chamada vira dois `send` no log da rede e gera dois OKs. Por isso, sob falhas, `msgs` não bate com os eventos `send`.
   - O custo de uma eleição é a soma dos `election_end` de todos os nós.
 - Log:
   - `election_start` (`motivo`, `maiores`);
@@ -70,15 +72,20 @@ Implementação: `src/bully.py` (issue #4). Testes: `tests/test_bully.py`. Usa o
   - Sob perda aleatória, a convergência acontece com probabilidade 1 (cada nova tentativa tem chance de passar), mas sem limite de tempo.
 - **Complexidade (queda do líder n, com n nós):**
   - **Melhor caso:** só o nó n − 1 começa. São 1 `ELECTION` e n − 1 `COORDINATOR`, O(n).
-  - **Pior caso:** o nó 1 começa e cada nó i manda `ELECTION` aos n − i maiores. São n(n − 1)/2 `ELECTION`, (n − 1)(n − 2)/2 OKs e n − 1 `COORDINATOR`, O(n²).
-  - Com o detector por heartbeat, todos os nós percebem a queda com no máximo cerca de um intervalo de diferença e começam eleições quase juntos. O custo real fica perto do pior caso. Os experimentos (#6) medem com o `msgs` de `election_end`.
+  - **Pior caso de uma rodada:** o nó 1 começa e cada nó i manda `ELECTION` aos n − i maiores. São n(n − 1)/2 `ELECTION`, (n − 1)(n − 2)/2 OKs e n − 1 `COORDINATOR`, O(n²).
+  - **Rodadas extras:** essas fórmulas contam uma rodada. Os detectores não suspeitam do líder caído todos no mesmo instante: o primeiro nó que suspeita começa a eleição, e o novo líder vence logo.
+    - O novo líder, e os nós que já o aceitaram, repetem a eleição (`no_maior_vivo`) enquanto o próprio detector ainda vê o líder antigo vivo. Isso dura até cerca de um `HB_INTERVAL`.
+    - Cada repetição custa mais 1 `ELECTION` por nó maior caído e n − 1 `COORDINATOR`, além das cascatas de `ELECTION`/OK.
+    - Por isso, o custo medido depois de um crash pode passar da fórmula de uma rodada. Na revisão, com n = 5, chegou a 14 `ELECTION`, 7 OKs e 12 `COORDINATOR`.
+    - O líder eleito e o limite de tempo não mudam. Os experimentos (#6) medem o custo com o `msgs` de `election_end`.
 
 ## 4. Verificação
 
 - `test_mensagens_recebidas` (unitário): OK ao `ELECTION`; aceita `COORDINATOR` de maior e rejeita o de menor.
 - `test_quando_comeca_uma_eleicao` (unitário): sem líder, líder suspeito e nó maior vivo disparam eleição; líder vivo não dispara.
 - `test_sem_ok_de_nenhum_maior_vira_lider` (unitário): sem OK, o nó vence e o contador sai certo.
-- `test_cenario_normal_lider_e_o_maior_id`: 4 nós começam juntos (eleições concorrentes); todos ficam com o nó 4 e ninguém decide outro líder.
+- `test_host_padrao_e_loopback`, `test_parametros_invalidos` (unitários): `BIND_ADDR` padrão é 127.0.0.1; timeout inválido é rejeitado.
+- `test_cenario_normal_lider_e_o_maior_id`: 4 nós começam juntos, e pelo menos duas eleições ficam abertas ao mesmo tempo (concorrentes). Todos ficam com o nó 4, e ninguém decide outro líder.
 - `test_lider_cai_novo_lider_e_anunciado_e_maior_id_volta`:
   - o nó 4 cai, e os nós 1 a 3 elegem o 3 dentro do limite, sem decidir outro;
   - o nó 4 volta e todos passam a ter o 4;
@@ -87,5 +94,6 @@ Implementação: `src/bully.py` (issue #4). Testes: `tests/test_bully.py`. Usa o
 ## 5. Limitações
 
 - **Troca de líder:** quando um nó maior volta, o líder antigo continua se achando líder até o `COORDINATOR` chegar (cerca de uma ida e volta). Não há "no máximo um líder a cada instante".
+- **Subida em tempos diferentes:** no compose, os contêineres sobem com alguma diferença de tempo, e os primeiros podem se declarar líderes até o maior subir. É o mesmo caso da volta de um nó maior.
 - **Partição:** há dois líderes, um por lado, até a cura. Partição assimétrica (um sentido só) pode causar eleições repetidas enquanto durar.
 - **Timeouts fixos:** `RPC_TIMEOUT` serve para o OK e `2 × RPC_TIMEOUT` para o `COORDINATOR`; não há ajuste adaptativo.
