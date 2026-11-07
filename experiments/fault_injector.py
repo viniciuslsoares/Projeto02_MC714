@@ -82,7 +82,11 @@ class FaultInjector:
                 self.on_crash(node_id)
             elif self.modo_docker:
                 nome_container = f"mc714-node{node_id}"
-                subprocess.run(["docker", "stop", nome_container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                # docker kill manda SIGKILL: o nó morre sem rodar código de encerramento
+                # (docker stop mandaria SIGTERM, que o nó trata como desligamento gracioso)
+                resultado = subprocess.run(["docker", "kill", nome_container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if resultado.returncode != 0:
+                    print(f"  [Aviso] 'docker kill {nome_container}' falhou (código {resultado.returncode})")
 
         elif acao == "recover":
             node_id = evento.get("node")
@@ -91,7 +95,9 @@ class FaultInjector:
                 self.on_recover(node_id)
             elif self.modo_docker:
                 nome_container = f"mc714-node{node_id}"
-                subprocess.run(["docker", "start", nome_container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                resultado = subprocess.run(["docker", "start", nome_container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if resultado.returncode != 0:
+                    print(f"  [Aviso] 'docker start {nome_container}' falhou (código {resultado.returncode})")
 
         elif acao == "set_faults":
             node_id = evento.get("node")
