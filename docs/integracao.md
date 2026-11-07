@@ -175,7 +175,45 @@ COMPOSE_PROFILES=integracao ./scripts/run_scenario.sh scenarios/integracao/queda
 
 ## 7. Resultados
 
-Preenchido a partir de `results/experimentos/integracao.csv`, depois da rodada sobre o commit registrado no `.meta.json`.
+Dados:
+- `results/experimentos/integracao.csv` e `integracao_tarefas.csv`, com 5 execuções de cada cenário (600 tarefas por execução);
+- geradas pelo `run_all` sobre o commit registrado no `.meta.json`, sem alterações locais;
+- o ambiente também está no `.meta.json`: Apple M2 Pro, macOS, CPython 3.14.
+
+Intervalos de confiança e figuras ficam para a issue #9.
+
+| Métrica: mediana das execuções (mín–máx) | `integracao_normal` | `integracao_quedas` |
+|---|---|---|
+| Tarefas confirmadas | 600/600 nas 5 | 600/600 nas 5 |
+| Vazão (tarefas/s) | 19,96 (19,95–19,96) | 19,96 (19,95–19,96) |
+| Latência p50 (ms) | 109,8 (109,4–111,3) | 110,6 (110,2–113,2) |
+| Latência p95 (ms) | 114,7 (113,4–117,2) | 327,9 (321,0–555,4) |
+| Latência p99 (ms) | 119,0 (115,2–121,2) | 1527,7 (1513,5–1682,3) |
+| Latência máxima (ms) | 126,2 (120,7–130,9) | 1850,0 (1829,4–2020,3) |
+| Maior pausa sem confirmações (s) | 0,07 (0,06–0,07) | 1,72 (1,70–1,89) |
+| Tarefas reatribuídas | 0 | 20 (18–23) |
+| Tarefas executadas duas vezes | 0 | 2 (2–2) |
+| `[AVISO]` do verificador | nenhum | nenhum |
+
+- Juntando as 3000 tarefas de cada cenário, os percentis p50/p95/p99 são:
+  - sem falhas: 110,0/114,9/118,8 ms;
+  - com quedas: 110,8/427,3/1618,5 ms.
+- **R1 e R2:** valem em todas as execuções. Todas as tarefas foram confirmadas depois de executadas, nenhuma esteve com dois líderes ao mesmo tempo, e as 6 propriedades do detector e do Bully deram `[OK]`.
+- **Sem falhas:** a latência é a tarefa (100 ms) mais cerca de 10 ms: duas idas e voltas HTTP locais, o log e o escalonamento das threads.
+- **Queda do worker** (5 s):
+  - Não muda a latência: o máximo das tarefas enviadas entre 5 e 8 s foi 125 ms.
+  - Até o detector suspeitar do worker (cerca de 2 s), metade das tarefas vai para ele, a conexão é recusada na hora, e a tarefa vai para o outro worker. São as cerca de 20 reatribuídas.
+  - Depois da suspeita, só o worker vivo recebe tarefas; quando o worker volta (10 s), recebe de novo.
+- **Queda do líder** (15 s):
+  - É dela toda a cauda: só as tarefas enviadas entre 13 e 18 s passaram de 200 ms (cerca de 34 por execução, de 600).
+  - O serviço fica cerca de 1,7 s sem confirmar nada. É a detecção (de 1,5 a 2,5 s depois da queda, conforme a fase dos heartbeats) mais a eleição, que leva poucos ms com processos locais.
+  - Por isso o p95 do cenário de falha fica em cerca de 330 ms, e o p99 e o máximo ficam perto da pausa.
+  - Nas 5 execuções, as 2 tarefas que estavam no worker quando o líder caiu rodaram de novo no novo líder ("pelo menos uma vez").
+  - Até achar o novo líder, uma tarefa pendente chegou a 32 pedidos (§8).
+- **Volta do líder** (22 s):
+  - O 3 vence a eleição e retoma a liderança sem custo para o cliente: o máximo das tarefas enviadas entre 22 e 25 s foi 125 ms.
+  - Nenhum worker recusou `EXEC`, e nenhum pedido terminou em `falhou`.
+- **Vazão:** é a carga oferecida nos dois cenários, porque as tarefas atrasadas pela queda do líder também são confirmadas (§8, trabalho simulado).
 
 ## 8. Limitações
 
