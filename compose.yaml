@@ -1,6 +1,8 @@
 # Ambiente de referência: N nós lógicos em uma única máquina (Docker Compose v2).
 # Cada nó = contêiner independente; comunicação somente via rede HTTP/JSON (porta 8000).
 # Os nós 4 e 5 ficam no perfil "n5"; use ./scripts/env.sh up5, que também ajusta PEERS para 5 nós.
+# O cliente do serviço de tarefas (issue #8) fica no perfil "integracao": ele gera carga por
+# DURACAO_S segundos e grava results/logs/cliente.jsonl (docs/integracao.md).
 # As portas são publicadas só em 127.0.0.1: o /control não tem autenticação e não pode
 # ficar acessível a outras máquinas. Dentro da rede do compose o nó escuta em 0.0.0.0 (BIND_ADDR).
 
@@ -55,6 +57,24 @@ services:
     profiles: [n5]
     ports: ["127.0.0.1:8005:8000"]
     environment: {<<: *env, NODE_ID: "5"}
+  cliente:
+    <<: *node
+    container_name: mc714-cliente
+    profiles: [integracao]
+    command: ["python", "-m", "src.cliente"]
+    healthcheck: {disable: true}   # não é um nó: não tem /health
+    # nenhuma porta publicada: só fala com os nós pela rede do compose
+    environment:
+      PEERS: "${PEERS:-1=node1:8000,2=node2:8000,3=node3:8000}"
+      LOG_DIR: /app/results/logs
+      RPC_TIMEOUT: "${RPC_TIMEOUT:-1.0}"
+      TAXA: "${TAXA:-20}"
+      DURACAO_S: "${DURACAO_S:-30}"
+      TAREFA_MS: "${TAREFA_MS:-100}"
+    depends_on:
+      node1: {condition: service_healthy}
+      node2: {condition: service_healthy}
+      node3: {condition: service_healthy}
 
 networks:
   mc714:

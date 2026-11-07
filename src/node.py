@@ -22,6 +22,7 @@ from .detector import HeartbeatDetector
 from .eventlog import EventLog, LamportClock
 from .models import Message
 from .network import Network
+from .tarefas import Despachante
 
 
 class Node:
@@ -37,6 +38,7 @@ class Node:
         self.server = None
         self.detector = None               # detector de falhas (src/detector.py), criado em main()
         self.bully = None                  # eleição de líder (src/bully.py), criada em main()
+        self.tarefas = None                # serviço de tarefas (src/tarefas.py), criado em main()
         self.register("ping", self.on_ping)
 
     def on_ping(self, msg):
@@ -235,6 +237,8 @@ def main():
         # o Bully depende do detector para saber se o líder caiu
         node.detector = HeartbeatDetector(node, cfg.hb_interval, cfg.hb_timeout)
         node.bully = Bully(node, node.detector, cfg.rpc_timeout)
+        # serviço de tarefas da issue #8: só registra os handlers TASK e EXEC, sem threads
+        node.tarefas = Despachante(node, node.detector, node.bully, cfg.rpc_timeout)
     node.run_forever()
 
 

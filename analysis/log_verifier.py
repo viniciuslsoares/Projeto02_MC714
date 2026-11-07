@@ -26,6 +26,11 @@
 #                                    HB_TIMEOUT + HB_INTERVAL + 2 * RPC_TIMEOUT + folga; só não se cobra
 #                                    se antes disso outro nó sobe ou cai, ou começa uma falha de rede,
 #                                    nem se a mudança acontece com partição ou perda ativas (issue #7)
+# Serviço de tarefas (issue #8, só se houver tarefas no log; lê também o cliente.jsonl da pasta):
+#   tarefas.execucao   (vivacidade) toda tarefa enviada pelo cliente foi confirmada, e só depois de
+#                                    um task_end dela em algum worker
+#   tarefas.um_lider   (segurança)  nenhuma tarefa esteve com dois líderes ao mesmo tempo (do primeiro
+#                                    task_assign de um pedido ao task_reply, ou ao fim da vida do líder)
 #
 # As propriedades valem no período síncrono. Com partição, perda ou atraso, um [AVISO] pode ser
 # a consequência esperada da falha; o cabeçalho do relatório diz se houve falhas de rede no log
@@ -34,6 +39,9 @@ import argparse
 import glob
 import json
 import os
+from itertools import combinations
+
+from src.eventlog import read_events
 
 FOLGA = 0.5     # s: atraso de escalonamento admitido nos prazos de vivacidade
 MARGEM = 0.05   # s: um heartbeat logado logo antes do suspect pode ainda não ter sido anotado
@@ -320,6 +328,58 @@ def convergencia(vidas, t0, folga):
                      f"ou durante partição ou perda)")
 
 
+# --- serviço de tarefas (issue #8) ---
+
+def ler_cliente(pasta):
+    caminho = os.path.join(pasta, "cliente.jsonl")
+    return read_events(caminho) if os.path.exists(caminho) else []
+
+
+def tarefas_execucao(vidas, cliente, t0):
+    if not cliente:
+        return False, "tarefas.execucao", "nenhum cliente.jsonl na pasta: não dá para conferir"
+    fins = {}
+    for v in vidas:
+        for e in v.do_tipo("task_end"):
+            fins.setdefault(e["data"]["task"], []).append(e["ts"])
+    enviadas = [e["data"]["id"] for e in cliente if e["event"] == "tarefa_enviada"]
+    confirmadas = {e["data"]["id"]: e["ts"] for e in cliente if e["event"] == "tarefa_confirmada"}
+    erros = []
+    for k in enviadas:
+        if k not in confirmadas:
+            erros.append(f"tarefa {k} não foi confirmada")
+        elif not any(t <= confirmadas[k] for t in fins.get(k, [])):
+            erros.append(f"tarefa {k} confirmada em +{confirmadas[k] - t0:.2f}s sem ter sido executada")
+    duplas = sum(1 for k in enviadas if len(fins.get(k, [])) > 1)
+    return resultado("tarefas.execucao", len(enviadas), erros,
+                     f"{len(enviadas)} tarefas enviadas, todas confirmadas depois de executadas "
+                     f"({duplas} executadas mais de uma vez: semântica pelo menos uma vez)")
+
+
+def tarefas_um_lider(vidas, t0):
+    # um pedido segura a tarefa no líder do primeiro task_assign até o task_reply; se o líder cai
+    # antes de responder, até o fim da vida dele
+    pedidos = {}   # (vida, tarefa, pedido) -> [início, fim]
+    for i, v in enumerate(vidas):
+        for e in v.eventos:
+            if e["event"] in ("task_assign", "task_reply"):
+                chave = (i, e["data"]["task"], e["data"]["pedido"])
+                if e["event"] == "task_assign":
+                    pedidos.setdefault(chave, [e["ts"], v.fim])
+                elif chave in pedidos:
+                    pedidos[chave][1] = e["ts"]
+    por_tarefa = {}
+    for (i, tarefa, _), (a, b) in pedidos.items():
+        por_tarefa.setdefault(tarefa, []).append((a, b, vidas[i].no))
+    erros = []
+    for tarefa, xs in sorted(por_tarefa.items()):
+        for (a1, b1, l1), (a2, b2, l2) in combinations(sorted(xs), 2):
+            if l1 != l2 and a2 < b1:
+                erros.append(f"tarefa {tarefa} com os líderes {l1} e {l2} ao mesmo tempo em +{a2 - t0:.2f}s")
+    return resultado("tarefas.um_lider", len(por_tarefa), erros,
+                     f"{len(por_tarefa)} tarefas atribuídas, nenhuma com dois líderes ao mesmo tempo")
+
+
 def verificar(pasta, folga=FOLGA):
     # devolve o cabeçalho e uma lista de (ok, nome, texto), uma por propriedade
     vidas = ler_vidas(pasta)
@@ -351,6 +411,9 @@ def verificar(pasta, folga=FOLGA):
         props += [acordo(vidas, t0), convergencia(vidas, t0, folga)]
     else:
         props += [(False, "bully", "nenhum bully_start nos logs (HB_INTERVAL = 0, ou logs de antes da issue #5)")]
+    cliente = ler_cliente(pasta)
+    if cliente or any(v.primeiro("task_assign") for v in vidas):
+        props += [tarefas_execucao(vidas, cliente, t0), tarefas_um_lider(vidas, t0)]
     return cabecalho, props
 
 

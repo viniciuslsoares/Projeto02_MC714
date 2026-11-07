@@ -30,7 +30,7 @@ echo "=================================================="
 
 # 1. Prepara diretórios
 mkdir -p "$DEST_DIR"
-rm -f "$DEST_DIR"/node*.jsonl   # logs de uma execução anterior não se misturam aos desta
+rm -f "$DEST_DIR"/*.jsonl       # logs de uma execução anterior (nós e cliente) não se misturam aos desta
 mkdir -p results/logs
 rm -f results/logs/*.jsonl
 rm -rf results/logs/state

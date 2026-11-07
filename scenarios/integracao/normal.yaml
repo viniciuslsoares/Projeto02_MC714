@@ -1,0 +1,6 @@
+# Serviço de tarefas (issue #8), cenário normal: 30 s de carga, sem falhas.
+# Roda com o cliente gerando carga (python -m experiments.integracao, docs/integracao.md).
+name: "integracao_normal"
+duration_s: 30.0
+seed: 1006
+events: []
