@@ -81,6 +81,14 @@ def crash_gracioso_do_3(logs):
     logs[3] += [ev(3, k / 10, "recv", peer=j, msg="heartbeat") for k in range(11, 19) for j in (1, 2)]
 
 
+def nos_sobem_quase_juntos(logs):
+    # processos locais podem subir a menos de 1 µs um do outro (menos que o EPS do verificador)
+    for i, eventos in logs.items():
+        for e in eventos:
+            if e["ts"] == 0.0:
+                e["ts"] = (i - 1) * 4e-7
+
+
 def logs_antigos_sem_peers(logs):
     for eventos in logs.values():
         for e in eventos:
@@ -127,12 +135,16 @@ def violacao_converge_e_diverge(logs):
     logs[2].append(ev(2, 1.0, "leader", lider=2))
 
 
-def avisos(tmp_path, logs):
+def gravar(pasta, logs):
     for i, eventos in logs.items():
-        with open(tmp_path / f"node{i}.jsonl", "w", encoding="utf-8") as f:
+        with open(pasta / f"node{i}.jsonl", "w", encoding="utf-8") as f:
             for e in sorted(eventos, key=lambda e: e["ts"]):
                 f.write(f'{{"ts": {e["ts"]}, "node"' if e.get("cortada") else json.dumps(e))
                 f.write("\n")
+
+
+def avisos(tmp_path, logs):
+    gravar(tmp_path, logs)
     _, props = verificar(str(tmp_path))
     return {nome for ok, nome, _ in props if not ok}
 
@@ -159,6 +171,7 @@ def test_violacao_deliberada_e_detectada(tmp_path, violar, propriedade):
     lambda logs: crash_do_3(logs, eleger_2=True),       # crash tratado como o modelo prevê
     crash_e_volta_no_meio_da_eleicao,
     crash_gracioso_do_3,
+    nos_sobem_quase_juntos,
     logs_antigos_sem_peers,
 ])
 def test_execucao_correta_sem_avisos(tmp_path, cenario):

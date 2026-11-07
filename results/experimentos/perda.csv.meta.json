@@ -1,0 +1,75 @@
+{
+  "grade": "perda",
+  "completa": true,
+  "comando": "python -m experiments.run_all",
+  "git_commit": "21a3a709bf4e991ffb358255d4bfe69088637ce3",
+  "git_alteracoes_locais": false,
+  "inicio_utc": "2026-11-07T21:21:13+00:00",
+  "fim_utc": "2026-11-07T21:32:48+00:00",
+  "duracao_total_s": 694.7,
+  "config": {
+    "nome": "perda",
+    "parametro": "drop_prob",
+    "niveis": [
+      0.0,
+      0.1,
+      0.2,
+      0.3
+    ],
+    "base": {
+      "n": 5
+    },
+    "repeticoes": 10,
+    "semente0": 1,
+    "aquecimento_s": 2.0,
+    "antes_s": 4.0,
+    "depois_s": 10.0
+  },
+  "parametros_padrao": {
+    "n": 5,
+    "drop_prob": 0.0,
+    "hb_intervalo": 0.5,
+    "hb_timeout": 2.0,
+    "rpc_timeout": 1.0
+  },
+  "ensaio": {
+    "aquecimento_s": 2.0,
+    "antes_do_crash_s": 4.0,
+    "depois_do_crash_s": 10.0,
+    "falha": "SIGKILL do nó n (o líder)"
+  },
+  "ambiente": {
+    "so": "macOS-26.7.1-arm64-arm-64bit-Mach-O",
+    "maquina": "arm64",
+    "cpu": "Apple M2 Pro",
+    "cpus": 10,
+    "memoria_gb": 16.0,
+    "python": "CPython 3.14.4",
+    "execucao": "um processo por nó (python -m src.node), todos em 127.0.0.1 na mesma máquina"
+  },
+  "colunas": {
+    "grade": "nome da grade",
+    "repeticao": "número da repetição (1, 2, ...)",
+    "seed": "SEED dos nós (cada nó usa SEED * 1000 + NODE_ID)",
+    "n": "número de nós",
+    "drop_prob": "probabilidade de perda de cada mensagem (e de cada resposta)",
+    "hb_intervalo": "HB_INTERVAL (s)",
+    "hb_timeout": "HB_TIMEOUT (s)",
+    "rpc_timeout": "RPC_TIMEOUT (s), também o timeout do OK no Bully",
+    "aquecimento_s": "espera depois de todos terem o líder n, fora das medidas (s)",
+    "duracao_s": "duração total do ensaio, da subida dos processos ao fim (s)",
+    "deteccao_s": "tempo do crash até cada sobrevivente suspeitar do nó n (s), separados por ';'; vazio = nenhum suspect depois do crash (não suspeitou, ou já suspeitava antes dele)",
+    "deteccao_max_s": "tempo do crash até o último sobrevivente suspeitar (s)",
+    "convergencia_s": "tempo do crash até todos os sobreviventes terem o nó n-1 como líder (s); vazio = não convergiu",
+    "eleicao_s": "tempo da primeira suspeita até a convergência (s); com perda pode ser negativo",
+    "eleicoes": "eleições (election_end) começadas entre o crash e a estabilização",
+    "msgs_election": "ELECTION enviados nessas eleições",
+    "msgs_ok": "OK enviados nessas eleições",
+    "msgs_coordinator": "COORDINATOR enviados nessas eleições",
+    "msgs_bully": "total de mensagens do Bully nessas eleições",
+    "falsos_positivos": "suspeitas de nós vivos durante as medidas",
+    "fp_por_par_min": "falsos positivos por par monitorado (observador, peer) por minuto",
+    "hb_msgs_por_s": "heartbeats enviados por segundo no sistema, antes do crash",
+    "avisos_verificador": "propriedades com [AVISO] no analysis.log_verifier, separadas por ';'"
+  }
+}

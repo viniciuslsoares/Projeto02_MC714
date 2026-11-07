@@ -20,11 +20,13 @@ Docker + Docker Compose v2, Python ≥ 3.12 (testes), bash (WSL/Git Bash no Wind
 python -m pip install -r requirements.txt
 python -m pytest              # testes automatizados (docs/testes.md)
 python -m analysis.log_verifier [pasta]  # verifica safety/liveness nos logs -> results/verifications.txt
+python -m experiments.run_all  # roda todos os experimentos -> results/experimentos/*.csv (docs/experimentos.md)
 ```
 Logs estruturados (JSONL, um arquivo por nó) ficam em `results/logs/node<ID>.jsonl`.
 Resultados de cenários com metadados ficam em `results/raw/<cenario>_seed<SEED>/`.
+Dados brutos dos experimentos (versionados): `results/experimentos/<grade>.csv` e `<grade>.csv.meta.json`.
 
-## Arquitetura e Falhas (issues #1 a #5)
+## Arquitetura e Falhas (issues #1 a #6)
 | Arquivo | Papel |
 |---|---|
 | `src/config.py` | Configuração via variáveis de ambiente (id, peers, porta, seed, timeouts, falhas de rede) |
@@ -40,6 +42,9 @@ Resultados de cenários com metadados ficam em `results/raw/<cenario>_seed<SEED>
 | `src/bully.py` | Eleição de líder pelo Bully (#4): `ELECTION`/`OK`/`COORDINATOR`, usa o detector para saber se o líder caiu; líder atual em `GET /status`; modelo em `docs/modelo_bully.md` |
 | `analysis/log_verifier.py` | Verificador de logs (#5): confere segurança e vivacidade do detector e do Bully e escreve `[OK]`/`[AVISO]` por propriedade; o `run_scenario.sh` roda ele no fim de cada cenário |
 | `docs/testes.md` | Estratégia de testes em 3 camadas, cenário normal e de falha de cada algoritmo, propriedades conferidas pelo verificador |
+| `experiments/grid.py` | Grade de experimentos (#6): `execute_grid(GridConfig)` roda ensaios com um processo por nó, derruba o líder e mede detecção, falsos positivos, heartbeats/s, convergência e mensagens do Bully; grava CSV + `.csv.meta.json` |
+| `experiments/run_all.py` | Porta de entrada única dos experimentos: grades `nos` (n = 3, 5, 7, 9) e `perda` (0 a 0,3) |
+| `docs/experimentos.md` | Roteiro de um ensaio, grades, definição de cada métrica, metadados e limitações |
 
 Algoritmos registram handlers com `node.register("TIPO", fn)` e enviam com `node.net.send(peer, "TIPO", payload, timeout)`.
 
@@ -59,4 +64,4 @@ NET_DELAY_MS, NET_JITTER_MS, NET_DUP_PROB` (detalhes em `src/config.py`). O `com
 `SEED` é a semente do experimento (a registrada no `meta.json`); cada nó usa a sua própria, `SEED * 1000 + NODE_ID`, para que as falhas sorteadas sejam independentes entre nós.
 
 ## Reprodução completa e relatório
-Testes e verificação: `docs/testes.md`. Experimentos e relatório serão adicionados conforme as issues #6 e #9.
+Testes e verificação: `docs/testes.md`. Experimentos: `python -m experiments.run_all` refaz todos os CSVs brutos (`docs/experimentos.md`). Relatório: issue #9.
