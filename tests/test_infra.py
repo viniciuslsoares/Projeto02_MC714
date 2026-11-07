@@ -98,7 +98,7 @@ def test_peer_inexistente_falha_sem_travar(tmp_path):
 def test_particao_bloqueia_e_cura(cluster):
     a = cluster[0]
     a.net.block(2)
-    assert a.net.send(2, "ping") is None
+    assert a.net.send(2, "ping", timeout=0.1) is None   # timeout curto: a partição espera o timeout
     assert any(e["event"] == "drop" and e["data"]["reason"] == "partition" for e in read_events(a.log.path))
     a.net.unblock(2)
     assert a.net.send(2, "ping") is not None
@@ -106,7 +106,8 @@ def test_particao_bloqueia_e_cura(cluster):
 
 def test_perda_total_e_reprodutivel(tmp_path):
     def run(sub):
-        nodes = make_cluster(tmp_path / sub, n=2, faults=cfg.NetFaults(drop_prob=0.5))
+        # rpc_timeout curto: cada perda (requisição ou resposta) espera o timeout
+        nodes = make_cluster(tmp_path / sub, n=2, faults=cfg.NetFaults(drop_prob=0.5), rpc_timeout=0.05)
         outcome = [nodes[0].net.send(2, "ping") is not None for _ in range(30)]
         for n in nodes:
             n.stop()
@@ -165,8 +166,8 @@ def test_endpoint_controle_bloqueio_e_falhas(cluster):
         assert res["ok"] is True
         assert res["action"] == "block"
 
-    # Agora o nó 1 não consegue enviar para o 2
-    assert node1.net.send(2, "ping") is None
+    # Agora o nó 1 não consegue enviar para o 2 (timeout curto: a partição espera o timeout)
+    assert node1.net.send(2, "ping", timeout=0.1) is None
 
     # Desbloqueia via /control
     req_unblock = urllib.request.Request(

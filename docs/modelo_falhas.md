@@ -24,8 +24,8 @@ Para permitir a investigação experimental do comportamento dos algoritmos dist
 |---|---|---|---|
 | **Crash-Stop** | `docker stop mc714-nodeX` | Nó encerra imediatamente suas conexões e para de responder a requisições e pings. | Não se recupera no cenário. |
 | **Crash-Recovery** | `docker start mc714-nodeX` | Nó volta a executar, carrega estado salvo em disco (`results/logs/state/`) e reintegra o cluster. | Volta ativo mantendo época/termo anterior. |
-| **Partição de Rede** | `action: partition` via `/control` | Bloqueio bidirecional de mensagens entre nós especificados (ex: isola nó 3 de 1 e 2). Mensagens são descartadas e logadas (`drop, reason=partition`). | `action: heal` desbloqueia o tráfego entre os nós. |
-| **Perda de Mensagens** | `drop_prob` via `/control` | Porcentagem configurável de mensagens é descartada silenciosamente no emissor (`drop, reason=loss`). | `action: reset_faults` restaura probabilidade a 0. |
+| **Partição de Rede** | `action: partition` via `/control` | Bloqueio bidirecional de mensagens entre nós especificados (ex: isola nó 3 de 1 e 2). Mensagens são descartadas e logadas (`drop, reason=partition`); como numa rede real, o emissor só percebe a falha quando o timeout da chamada expira. | `action: heal` desbloqueia o tráfego entre os nós. |
+| **Perda de Mensagens** | `drop_prob` via `/control` | Perda nos dois sentidos, sorteada de forma independente com a mesma `drop_prob`: a requisição pode se perder (`drop, reason=loss`; o receptor nunca a recebe) ou a resposta pode se perder (`drop, reason=reply_loss`; o receptor já recebeu e processou a mensagem). Em ambos os casos o emissor só percebe a perda quando o timeout expira. | `action: reset_faults` restaura probabilidade a 0. |
 | **Atraso e Jitter** | `delay_ms` e `jitter_ms` | Mensagens sofrem atraso base fixo + jitter uniforme antes do envio HTTP. | `action: reset_faults` restaura atraso a 0ms. |
 | **Duplicação** | `dup_prob` via `/control` | Mensagens são transmitidas duas vezes consecutivas para testar idempotência. | `action: reset_faults` restaura duplicação a 0. |
 

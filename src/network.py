@@ -88,13 +88,18 @@ class Network:
             isolado = peer_id in self.bloqueados
             faults = self.faults
 
+        # Numa rede real o emissor não fica sabendo que a mensagem se perdeu: ele só
+        # desiste quando o timeout expira. Por isso esperamos o timeout antes de
+        # devolver None, senão os tempos medidos sob falha sairiam otimistas.
         if isolado:
             self.log.emit("drop", peer=peer_id, msg=msg_type, reason="partition")
+            time.sleep(timeout)
             return None
 
-        # perda de mensagem simulada
+        # perda da requisição simulada (o receptor nunca recebe a mensagem)
         if faults.drop_prob > 0 and self.sorteio() < faults.drop_prob:
             self.log.emit("drop", peer=peer_id, msg=msg_type, reason="loss")
+            time.sleep(timeout)
             return None
 
         # atraso simulado
@@ -129,6 +134,17 @@ class Network:
             rtt = round((time.monotonic() - inicio) * 1000, 3)
             self.log.emit("send_failed", peer=peer_id, msg=msg_type,
                           error=type(erro).__name__, rtt_ms=rtt)
+            return None
+
+        # perda da resposta simulada: sorteia de novo com a mesma drop_prob (cada
+        # sentido perde de forma independente). O receptor JÁ processou a mensagem;
+        # só a resposta não chega, e o emissor espera o resto do timeout.
+        with self.lock:
+            drop_prob = self.faults.drop_prob
+        if drop_prob > 0 and self.sorteio() < drop_prob:
+            self.log.emit("drop", peer=peer_id, msg=msg_type, reason="reply_loss")
+            decorrido = time.monotonic() - inicio
+            time.sleep(max(0, timeout - decorrido))
             return None
 
         resposta = Message.from_dict(corpo)
