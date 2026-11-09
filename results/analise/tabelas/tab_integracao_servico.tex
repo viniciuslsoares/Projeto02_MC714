@@ -1,0 +1,16 @@
+% Tabela gerada automaticamente por analysis/analise.py
+\begin{table}[htbp]
+\caption{Desempenho e Disponibilidade do Serviço de Tarefas Integrado}
+\label{tab:integracao_servico}
+\centering
+\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Cenário & Vazão (req/s) & Latência p50 & Latência p95 & Latência p99 & Pausa Máx. & Tarefas 2x \\
+ & (Média) & (ms) & (ms) & (ms) & (s) & (Média) \\
+\midrule
+Carga Normal & 19.96 & 110.1 & 114.8 & 118.0 & 0.07 & 0.0 \\
+Sob Quedas & 19.96 & 111.0 & 372.7 & 1571.8 & 1.76 & 2.0 \\
+\bottomrule
+\end{tabular}
+\end{table}

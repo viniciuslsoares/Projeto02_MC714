@@ -1,0 +1,19 @@
+% Tabela gerada automaticamente por analysis/analise.py
+\begin{table*}[htbp]
+\caption{Avaliação dos Cenários de Falhas Combinadas e Partições}
+\label{tab:cenarios_falha}
+\centering
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Cenário & Eventos de Injeção & Split-Brain (s) & Líderes Máx. & Propriedades com Aviso \\
+ & & (Média $\pm$ IC95\%) & & \\
+\midrule
+Cascata e Recuperação & crash:3, crash:2, recover:3, recover:2 & $0.02 \pm 0.01$ & 2 & \texttt{Nenhum} \\
+Partição Menor ID & partition:1, heal:1 & $3.84 \pm 0.33$ & 2 & \texttt{bully.acordo} \\
+Partição, Queda e Perda & partition:3, set\_faults:1, set\_faults:2, set\_faults:3... & $7.85 \pm 0.33$ & 2 & \texttt{bully.acordo} \\
+Partição de Rede (Líder) & partition:3, heal:3 & $2.73 \pm 0.55$ & 2 & \texttt{bully.acordo} \\
+Queda e Recuperação & crash:2, set\_faults:1, recover:2, reset\_faults:1 & $0.00 \pm 0.00$ & 1 & \texttt{Nenhum} \\
+\bottomrule
+\end{tabular}
+\end{table*}

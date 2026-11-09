@@ -3,7 +3,7 @@
 **Labels:** `relatório`, `vídeo`, `obrigatório` · **Sugestão de responsável:** Todos (coordenação: Pessoa B) · **Depende de:** #5, #6, #7, #8
 
 ## Tarefas
-- [ ] `analysis/analise.py`: lê CSVs brutos (nunca executa experimentos), calcula média ± IC95% e p50/p95/p99, gera tabelas `.tex` e figuras PDF.
+- [x] `analysis/analise.py`: lê CSVs brutos (nunca executa experimentos), calcula média ± IC95% e p50/p95/p99, gera tabelas `.tex` e figuras PDF.
 - [ ] Relatório IEEE, 2 colunas, ≤ 6 páginas + referências: motivação, modelo, arquitetura, algoritmos, correção, testes, cenários, métricas, resultados, limitações, conclusão. Citar código reutilizado.
 - [ ] Usar `HISTORICO.md` como fonte para a narrativa de iterações e decisões.
 - [ ] Vídeo de ~5 min com todos os integrantes: cenário normal, falha injetada, recuperação.
