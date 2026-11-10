@@ -73,4 +73,4 @@ NET_DELAY_MS, NET_JITTER_MS, NET_DUP_PROB` (detalhes em `src/config.py`). O `com
 `SEED` é a semente do experimento (a registrada no `meta.json`); cada nó usa a sua própria, `SEED * 1000 + NODE_ID`, para que as falhas sorteadas sejam independentes entre nós.
 
 ## Reprodução completa e relatório
-Testes e verificação: `docs/testes.md`. Experimentos, cenários e integração: `python -m experiments.run_all` refaz todos os CSVs brutos (`docs/experimentos.md`, `docs/cenarios.md`, `docs/integracao.md`). Relatório: issue #9.
+Testes e verificação: `docs/testes.md`. Experimentos, cenários e integração: `python -m experiments.run_all` refaz todos os CSVs brutos (`docs/experimentos.md`, `docs/cenarios.md`, `docs/integracao.md`). Relatório: [`docs/relatorio.pdf`](docs/relatorio.pdf) (versão preliminar: a primeira página ainda não tem os RAs nem os links do GitLab e do vídeo; issue #9).
